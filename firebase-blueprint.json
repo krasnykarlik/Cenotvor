@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Public and private information about the user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Client": {
+      "title": "Client Info",
+      "description": "Details about a customer.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "idNumber": { "type": "string" },
+        "dic": { "type": "string" },
+        "address": { "type": "string" }
+      },
+      "required": ["name", "address"]
+    },
+    "OfferItem": {
+      "title": "Offer Item",
+      "description": "A single line item in an offer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string", "enum": ["MATERIAL", "OTHER", "ZINEK_ZAROVY", "ZINEK_GALVANICKY", "TAHOKOV", "LAKOVANI_MOKRE", "LAKOVANI_PRASKOVE", "MONTAZ", "PRACE", "DOPRAVA"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "extraInfo": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "pricePerUnit": { "type": "number" },
+        "weightPerUnit": { "type": "number" },
+        "persons": { "type": "number" },
+        "hours": { "type": "number" },
+        "km": { "type": "number" },
+        "coefficient": { "type": "number" }
+      },
+      "required": ["id", "category", "title", "quantity", "unit", "pricePerUnit"]
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "A full price offer created by a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "number": { "type": "string" },
+        "userId": { "type": "string" },
+        "client": { "$ref": "#/entities/Client" },
+        "items": { "type": "array", "items": { "$ref": "#/entities/OfferItem" } },
+        "dateIssued": { "type": "string" },
+        "validUntil": { "type": "string" },
+        "currency": { "type": "string" },
+        "taxRate": { "type": "number" },
+        "preparedBy": { "type": "string" },
+        "receivedBy": { "type": "string" },
+        "notes": { "type": "string" },
+        "title": { "type": "string" },
+        "groupTaxRates": {
+          "type": "object",
+          "properties": {
+            "material": { "type": "number" },
+            "surface": { "type": "number" },
+            "assembly": { "type": "number" },
+            "transport": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "number", "userId", "client", "items", "dateIssued", "validUntil", "preparedBy"]
+    },
+    "Settings": {
+      "title": "User Settings",
+      "description": "Personalized application settings for a user.",
+      "type": "object",
+      "properties": {
+        "preparers": { "type": "array", "items": { "type": "string" } },
+        "defaultValidityDays": { "type": "number" },
+        "sheetUrl": { "type": "string" },
+        "lastSync": { "type": "number" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data."
+    },
+    "/users/{userId}/settings/current": {
+      "schema": "Settings",
+      "description": "User settings document."
+    },
+    "/offers/{offerId}": {
+      "schema": "Offer",
+      "description": "Price offers."
+    }
+  }
+}
