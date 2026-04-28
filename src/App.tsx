@@ -41,7 +41,10 @@ import {
   Clock,
   LayoutDashboard,
   Clock,
-  FileSignature
+  FileSignature,
+  CheckCircle,
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
@@ -368,6 +371,16 @@ export default function App() {
   const [showPriceList, setShowPriceList] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showValiditySettings, setShowValiditySettings] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [toasts, setToasts] = useState<{id: string, message: string, type: 'success'|'error'|'info'}[]>([]);
+
+  const addToast = (message: string, type: 'success'|'error'|'info' = 'info') => {
+    const id = Date.now().toString() + Math.random().toString();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
   const [newPreparerName, setNewPreparerName] = useState('');
   const [showNewPreparerInput, setShowNewPreparerInput] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -512,13 +525,13 @@ export default function App() {
         setPriceList(items);
         setPriceHeaders(headers);
         setLastSync(Date.now());
-        alert(`Synchronizace úspěšná. Bylo načteno ${items.length} položek.`);
+        addToast(`Synchronizace úspěšná. Bylo načteno ${items.length} položek.`, 'success');
       } else {
-        alert("V tabulce nebyly nalezeny žádné platné položky. Zkontrolujte prosím hlavičky sloupců (Název, MJ, Cena, Váha).");
+        addToast("V tabulce nebyly nalezeny žádné platné položky. Zkontrolujte prosím hlavičky sloupců (Název, MJ, Cena, Váha).", 'error');
       }
     } catch (e) {
       console.error("Sync failed", e);
-      alert("Synchronizace selhala. Zkontrolujte prosím URL adresu a zda je tabulka publikována (Soubor -> Sdílet -> Publikovat na web -> Formát: .csv).");
+      addToast("Synchronizace selhala. Zkontrolujte prosím URL adresu a zda je tabulka publikována.", 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -704,7 +717,7 @@ export default function App() {
       newItem.title = 'Práce';
       newItem.coefficient = 2.6;
     } else if (category === 'MATERIAL') {
-      newItem.title = 'Materiál';
+      newItem.title = '';
       newItem.unit = 'm';
       newItem.weightPerUnit = 0;
     } else if (category === 'TAHOKOV') {
@@ -821,16 +834,16 @@ export default function App() {
   // Handle Save to Cloud
   const handleCloudSave = async () => {
     if (!user) {
-      alert("Pro ukládání do cloudu se musíte nejdříve přihlásit.");
+      addToast("Pro ukládání do cloudu se musíte nejdříve přihlásit.", 'error');
       signIn();
       return;
     }
     try {
       await saveOffer(offer);
-      alert("Nabídka byla úspěšně uložena do cloudu.");
+      addToast("Nabídka byla úspěšně uložena do cloudu.", 'success');
     } catch (e) {
       console.error("Cloud save failed", e);
-      alert("Chyba při ukládání do cloudu.");
+      addToast("Chyba při ukládání do cloudu.", 'error');
     }
   };
 
@@ -838,33 +851,42 @@ export default function App() {
   useEffect(() => {
     // Apply user settings first
     if (userSettings) {
-      if (userSettings.preparers) setPreparers(userSettings.preparers);
-      if (userSettings.defaultValidityDays) setDefaultValidityDays(userSettings.defaultValidityDays);
-      if (userSettings.sheetUrl) setSheetUrl(userSettings.sheetUrl);
-      if (userSettings.lastSync) setLastSync(userSettings.lastSync);
+      setPreparers(prev => userSettings.preparers && JSON.stringify(prev) !== JSON.stringify(userSettings.preparers) ? userSettings.preparers : prev);
+      setDefaultValidityDays(prev => userSettings.defaultValidityDays !== undefined && prev !== userSettings.defaultValidityDays ? userSettings.defaultValidityDays : prev);
+      setLastSync(prev => userSettings.lastSync !== undefined && prev !== userSettings.lastSync ? userSettings.lastSync : prev);
+      
+      if (!globalSettings?.sheetUrl && userSettings.sheetUrl) {
+         setSheetUrl(prev => prev !== userSettings.sheetUrl ? userSettings.sheetUrl : prev);
+      }
     }
     
     // Global settings (broadcasted by admin) take priority for shared resources
     if (globalSettings) {
-      if (globalSettings.sheetUrl) setSheetUrl(globalSettings.sheetUrl);
-      // We can also sync preparers globally if admin manages them
-      if (globalSettings.preparers && isAdmin(user)) {
-         // for admin we use their own list, but for others we could inherit
+      if (globalSettings.sheetUrl) {
+         setSheetUrl(prev => prev !== globalSettings.sheetUrl ? globalSettings.sheetUrl : prev);
       }
     }
-  }, [userSettings, globalSettings, user]);
+  }, [userSettings, globalSettings]);
 
   // Sync settings to cloud when changed
   useEffect(() => {
-    if (user) {
-      saveSettings({
-        preparers,
-        defaultValidityDays,
-        sheetUrl,
-        lastSync
-      });
+    if (user && userSettings) {
+      const needsSave = 
+        JSON.stringify(preparers) !== JSON.stringify(userSettings.preparers) ||
+        defaultValidityDays !== userSettings.defaultValidityDays ||
+        sheetUrl !== userSettings.sheetUrl ||
+        lastSync !== userSettings.lastSync;
+        
+      if (needsSave) {
+        saveSettings({
+          preparers,
+          defaultValidityDays,
+          sheetUrl,
+          lastSync
+        });
+      }
     }
-  }, [preparers, defaultValidityDays, sheetUrl, lastSync, user]);
+  }, [preparers, defaultValidityDays, sheetUrl, lastSync, user, userSettings]);
 
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-slate-800 antialiased bg-slate-50 relative">
@@ -1074,14 +1096,14 @@ export default function App() {
                         }, 250);
                       } catch (err) {
                         console.error("Print generation failed:", err);
-                        alert('Tisk selhal. Zkuste to prosím znovu.');
+                        addToast('Tisk selhal. Zkuste to prosím znovu.', 'error');
                         if (document.body.contains(printContainer)) {
                            document.body.removeChild(printContainer);
                         }
                       }
                     } catch (err) {
                       console.error("PDF generation failed:", err);
-                      alert('Generování PDF selhalo. Zkuste to prosím znovu.');
+                      addToast('Generování PDF selhalo. Zkuste to prosím znovu.', 'error');
                     } finally {
                       setIsGeneratingPDF(false);
                     }
@@ -1851,7 +1873,40 @@ export default function App() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] tracking-wider">
                   <tr className="border-b border-slate-200">
-                    <th className="px-6 py-3 font-semibold">Popis / Specifikace</th>
+                    <th className="px-4 py-3 font-semibold w-10">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        checked={selectedItemIds.size > 0 && selectedItemIds.size === offer.items.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedItemIds(new Set(offer.items.map(i => i.id)));
+                          } else {
+                            setSelectedItemIds(new Set());
+                          }
+                        }}
+                      />
+                    </th>
+                    <th className="px-2 py-3 font-semibold text-left">
+                      {selectedItemIds.size > 0 ? (
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOffer(prev => ({ ...prev, items: prev.items.filter(i => !selectedItemIds.has(i.id)) }));
+                            const deletedCount = selectedItemIds.size;
+                            setSelectedItemIds(new Set());
+                            addToast(`Smazáno ${deletedCount} položek.`, 'success');
+                          }}
+                          className="text-red-500 hover:text-red-700 flex items-center gap-1 shrink-0"
+                        >
+                          <Trash2 size={14} /> Smazat vybrané
+                        </button>
+                      ) : (
+                        "Popis / Specifikace"
+                      )}
+                    </th>
                     <th className="px-4 py-3 font-semibold text-center">MJ</th>
                     <th className="px-4 py-3 font-semibold w-56 text-center">Výpočtová pole</th>
                     <th className="px-4 py-3 font-semibold w-24 text-right">Cena/MJ</th>
@@ -1867,9 +1922,22 @@ export default function App() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="group hover:bg-slate-50/50 transition-colors"
+                        className={`group hover:bg-slate-50/50 transition-colors ${selectedItemIds.has(item.id) ? 'bg-blue-50/50' : ''}`}
                       >
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-4 w-10">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            checked={selectedItemIds.has(item.id)}
+                            onChange={(e) => {
+                              const newSet = new Set(selectedItemIds);
+                              if (e.target.checked) newSet.add(item.id);
+                              else newSet.delete(item.id);
+                              setSelectedItemIds(newSet);
+                            }}
+                          />
+                        </td>
+                        <td className="px-2 py-4">
                           <div className="flex flex-col gap-1 group/row">
                               <div className="flex items-center gap-2">
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
@@ -1885,7 +1953,7 @@ export default function App() {
                                   <input 
                                     type="text"
                                     value={item.title || ''}
-                                    placeholder="Název položky..."
+                                    placeholder={item.category === 'MATERIAL' ? "Materiál..." : "Název položky..."}
                                     onFocus={() => setActiveAutocompleteId(item.id)}
                                       onBlur={() => setTimeout(() => setActiveAutocompleteId(null), 200)}
                                       onChange={(e) => updateItem(item.id, { title: e.target.value })}
@@ -1893,7 +1961,11 @@ export default function App() {
                                   />
                                   {/* Autocomplete for Material */}
                                   {item.category === 'MATERIAL' && activeAutocompleteId === item.id && (() => {
-                                    const filtered = priceList.filter(p => !item.title || p.title.toLowerCase().includes(item.title.toLowerCase())).slice(0, 10);
+                                    const searchParts = (item.title || '').toLowerCase().split(/\s+/).filter(Boolean);
+                                    const filtered = priceList.filter(p => {
+                                      const titleLower = (p.title || '').toLowerCase();
+                                      return searchParts.length === 0 || searchParts.every(part => titleLower.includes(part));
+                                    }).slice(0, 10);
                                     return (
                                       <div className="absolute z-[100] left-0 top-full mt-1 w-[280px] sm:w-[500px] bg-white border border-slate-200 rounded-lg shadow-2xl overflow-hidden border-t-4 border-t-blue-500">
                                         <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-100 flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest">
@@ -2399,7 +2471,7 @@ export default function App() {
                     const draftOffer = { ...offer, status: 'DRAFT' };
                     setOffer(draftOffer);
                     if (!user) {
-                      alert("Pro uložení se musíte nejdříve přihlásit (tlačítko vlevo dole).");
+                      addToast("Pro uložení se musíte nejdříve přihlásit (tlačítko vlevo dole).", 'info');
                       signIn();
                       return;
                     }
@@ -2408,7 +2480,7 @@ export default function App() {
                       executeNavigation('DRAFTS');
                     } catch (e) {
                       console.error("Save failed", e);
-                      alert("Chyba při ukládání.");
+                      addToast("Chyba při ukládání.", 'error');
                     }
                   }}
                   className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl shadow-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
@@ -2722,14 +2794,25 @@ export default function App() {
                       const idToDelete = showSoftDeleteConfirm.id;
                       const fromEditor = (showSoftDeleteConfirm as any).fromEditor;
                       setShowSoftDeleteConfirm(null);
+                      
+                      if (fromEditor && !user) {
+                        addToast("Pro uložení do cloudu se musíte nejdříve přihlásit.", 'info');
+                        signIn();
+                        return;
+                      }
+
                       try {
-                        await softDeleteOffer(idToDelete);
                         if (fromEditor) {
+                          await saveOffer({ ...offer, status: 'DELETED' });
                           setActiveMainView('DRAFTS');
                           resetOffer(true);
+                        } else {
+                          await softDeleteOffer(idToDelete);
                         }
+                        addToast("Nabídka přesunuta do koše.", "success");
                       } catch (err) {
                         console.error("Soft delete modal caught error", err);
+                        addToast("Nepodařilo se přesunout do koše.", "error");
                       }
                     }}
                     className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 text-sm"
@@ -2813,9 +2896,10 @@ export default function App() {
                         if (offer.id === idToDelete) {
                           resetOffer(true);
                         }
+                        addToast("Nabídka smazána.", "success");
                       } catch (err) {
-                        // Error is already alerted inside deleteOffer natively
                         console.error("Hard delete modal caught error", err);
+                        addToast("Nepodařilo se smazat nabídku.", "error");
                       }
                     }}
                     className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 text-sm"
@@ -2845,7 +2929,7 @@ export default function App() {
                   <button 
                     onClick={async () => {
                       if (!user) {
-                        alert("Pro uložení se musíte přihlásit.");
+                        addToast("Pro uložení se musíte přihlásit.", 'info');
                         signIn();
                         return;
                       }
@@ -2854,7 +2938,7 @@ export default function App() {
                         executeNavigation(pendingNavigation || 'NEW_OFFER');
                       } catch (err) {
                         console.error('Save failed', err);
-                        alert('Chyba při ukládání.');
+                        addToast('Chyba při ukládání.', 'error');
                       }
                     }}
                     className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md shadow-blue-200"
@@ -2881,6 +2965,32 @@ export default function App() {
             </motion.div>
           </div>
         )}
+
+        {/* Global Toasts */}
+        <div className="fixed bottom-4 right-4 z-[300] flex flex-col gap-2 pointer-events-none">
+          <AnimatePresence>
+            {toasts.map(toast => (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
+                  toast.type === 'success' 
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+                    : toast.type === 'error'
+                      ? 'bg-red-50 text-red-900 border-red-200'
+                      : 'bg-white text-slate-800 border-slate-200'
+                }`}
+              >
+                {toast.type === 'success' && <CheckCircle size={18} className="text-emerald-500" />}
+                {toast.type === 'error' && <AlertTriangle size={18} className="text-red-500" />}
+                {toast.type === 'info' && <Info size={18} className="text-blue-500" />}
+                <p className="text-sm font-medium">{toast.message}</p>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </main>
     </div>
   );

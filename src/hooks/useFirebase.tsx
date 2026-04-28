@@ -130,7 +130,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         console.log('Login popup closed by user');
       } else {
         console.error('Login failed:', error);
-        alert('Přihlášení se nezdařilo. Zkuste to prosím znovu.');
+        throw error;
       }
     }
   };
@@ -140,7 +140,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const saveOffer = async (offer: any) => {
-    if (!user) return;
+    if (!user) {
+      throw new Error("Nejste přihlášen k cloudu.");
+    }
     const offerRef = doc(db, 'offers', offer.id);
     const offerSnap = await getDoc(offerRef);
     
@@ -167,23 +169,19 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const deleteOffer = async (id: string) => {
     if (!user) {
-      alert("Chyba: Nejste přihlášen k cloudu.");
-      return;
+      throw new Error("Nejste přihlášen k cloudu.");
     }
     try {
       await deleteDoc(doc(db, 'offers', id));
-      alert("Trvalé smazání proběhlo v pořádku.");
     } catch (error: any) {
       console.error("Delete failed:", error);
-      alert("Definitivní smazání selhalo: " + error.message);
       throw error;
     }
   };
 
   const softDeleteOffer = async (id: string) => {
     if (!user) {
-      alert("Upozornění: Nejste přihlášen, operace neproběhne v cloudu.");
-      return;
+      throw new Error("Nejste přihlášen k cloudu.");
     }
     try {
       const offerRef = doc(db, 'offers', id);
@@ -199,10 +197,8 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updatedAt: serverTimestamp(),
         userId: user.uid
       });
-      alert("Nabídka přesunuta do koše úspěšně.");
     } catch (error: any) {
       console.error("Error in softDeleteOffer:", error);
-      alert("Nepodařilo se smazat nabídku. Přesný důvod: " + error.message);
       throw error;
     }
   };
