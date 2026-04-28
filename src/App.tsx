@@ -39,8 +39,6 @@ import {
   Unlock,
   LayoutDashboard,
   Clock,
-  LayoutDashboard,
-  Clock,
   FileSignature,
   CheckCircle,
   AlertTriangle,
@@ -48,7 +46,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
-import { useFirebase } from './hooks/useFirebase';
+import { useSupabase } from './hooks/useSupabase';
 
 // Types
 type ItemCategory = 
@@ -324,7 +322,7 @@ export default function App() {
     softDeleteOffer, 
     saveSettings,
     isAdmin 
-  } = useFirebase();
+  } = useSupabase(); // ZMĚNĚNO Z useFirebase
   const [offer, setOffer] = useState<Offer>(() => {
     const saved = localStorage.getItem('cenotvurce_current_offer');
     if (saved) {
