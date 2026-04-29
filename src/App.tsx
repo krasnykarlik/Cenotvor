@@ -43,9 +43,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useSupabase } from './hooks/useSupabase';
 
-// Import loga přímo ze složky src - zajistí správnou cestu po buildu
-import logoImg from './logo.png';
-
 // Types
 type ItemCategory = 
   | 'MATERIAL' 
@@ -251,6 +248,8 @@ const parseSpreadsheetData = (text: string) => {
   if (tabCount > 0 && tabCount >= semicolonCount && tabCount >= commaCount) delimiter = '\t';
   else if (semicolonCount > 0 && semicolonCount >= commaCount) delimiter = ';';
 
+  console.log(`Detected delimiter: ${delimiter === '\t' ? 'TAB' : delimiter} (Tabs: ${tabCount}, Semicolons: ${semicolonCount}, Commas: ${commaCount})`);
+
   const rawHeaders = headerLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
   const headers = rawHeaders.map(h => h.toLowerCase());
   
@@ -434,6 +433,7 @@ export default function App() {
     const now = Date.now();
     
     if (now - lastSync > ONE_WEEK) {
+      console.log("Starting automated weekly sync...");
       syncPriceList();
     }
   }, [sheetUrl]);
@@ -658,16 +658,19 @@ export default function App() {
   const totalMaterialWeight = useMemo(() => {
     return offer.items
       .filter(i => i.category === 'MATERIAL')
-      .reduce((sum, i) => sum + (i.quantity * (i.weightPerUnit || 0)), 0);
+      .reduce((sum, i) => sum + (Number(i.quantity) * (Number(i.weightPerUnit) || 0)), 0);
   }, [offer.items]);
 
   const totalMaterialPrice = useMemo(() => {
     return offer.items
       .filter(i => i.category === 'MATERIAL')
-      .reduce((sum, i) => sum + (i.quantity * i.pricePerUnit), 0);
+      .reduce((sum, i) => sum + (Number(i.quantity) * Number(i.pricePerUnit)), 0);
   }, [offer.items]);
 
   const getItemTotal = (item: OfferItem): number => {
+    const q = Number(item.quantity) || 0;
+    const p = Number(item.pricePerUnit) || 0;
+    
     switch (item.category) {
       case 'MATERIAL':
       case 'OTHER':
@@ -675,22 +678,22 @@ export default function App() {
       case 'LAKOVANI_MOKRE':
       case 'LAKOVANI_PRASKOVE':
       case 'ZINEK_GALVANICKY':
-        return item.quantity * item.pricePerUnit;
+        return q * p;
       
       case 'ZINEK_ZAROVY':
-        return totalMaterialWeight * item.pricePerUnit;
+        return totalMaterialWeight * p;
       
       case 'MONTAZ':
-        return (item.persons || 1) * (item.hours || 0) * item.pricePerUnit;
+        return (Number(item.persons) || 1) * (Number(item.hours) || 0) * p;
       
       case 'DOPRAVA':
-        return (item.km || 0) * item.pricePerUnit;
+        return (Number(item.km) || 0) * p;
       
       case 'PRACE':
-        return (totalMaterialPrice * (item.coefficient || 1)) - totalMaterialPrice;
+        return (totalMaterialPrice * (Number(item.coefficient) || 1)) - totalMaterialPrice;
       
       default:
-        return item.quantity * item.pricePerUnit;
+        return q * p;
     }
   };
 
@@ -714,7 +717,7 @@ export default function App() {
       category,
       title: '',
       description: '',
-      quantity: 1,
+      quantity: 0,
       unit: 'ks',
       pricePerUnit: 0,
     };
@@ -727,7 +730,7 @@ export default function App() {
       newItem.title = 'Montáž';
       newItem.unit = 'h';
       newItem.pricePerUnit = 750;
-      newItem.persons = 1;
+      newItem.persons = 0;
       newItem.hours = 0;
     } else if (category === 'DOPRAVA') {
       newItem.title = 'Doprava';
@@ -882,6 +885,10 @@ export default function App() {
     }
   }, [preparers, defaultValidityDays, sheetUrl, lastSync, user, userSettings]);
 
+  const handleNumericFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.select();
+  };
+
   if (supabaseLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -918,10 +925,6 @@ export default function App() {
       </div>
     );
   }
-
-  const handleNumericFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.select();
-  };
 
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-slate-800 antialiased bg-slate-50 relative">
@@ -1198,7 +1201,7 @@ export default function App() {
                               </div>
                             </div>
                             <img 
-                              src={logoImg}
+                              src="./logo.png" 
                               alt="Logo" 
                               className="h-[100px] w-auto max-w-[160px] object-contain self-start shrink-0" 
                             />
@@ -1234,7 +1237,7 @@ export default function App() {
                   </table>
                 </div>
 
-                {/* Project Title implementation - Using table for max stability */}
+                {/* Project Title */}
                 <div className="px-2 mt-2 mb-6">
                   <table className="w-full border-collapse border border-black border-spacing-0" style={{ tableLayout: 'fixed' }}>
                     <tbody>
@@ -2100,7 +2103,7 @@ export default function App() {
                               <>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Množství (MJ)</label>
-                                  <input type="number" onFocus={handleNumericFocus} value={!item.quantity ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <input type="number" onFocus={handleNumericFocus} value={item.quantity === 0 ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-300">×</div>
                                 <div className="flex flex-col items-center">
@@ -2122,12 +2125,12 @@ export default function App() {
                               <>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Lidí</label>
-                                  <input type="number" onFocus={handleNumericFocus} value={!item.persons ? '' : item.persons} placeholder="0" onChange={(e) => updateItem(item.id, { persons: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <input type="number" onFocus={handleNumericFocus} value={item.persons === 0 ? '' : item.persons} placeholder="0" onChange={(e) => updateItem(item.id, { persons: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-300">×</div>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Hodin</label>
-                                  <input type="number" onFocus={handleNumericFocus} value={!item.hours ? '' : item.hours} placeholder="0" onChange={(e) => updateItem(item.id, { hours: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <input type="number" onFocus={handleNumericFocus} value={item.hours === 0 ? '' : item.hours} placeholder="0" onChange={(e) => updateItem(item.id, { hours: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-400 font-bold">= {(item.persons || 0) * (item.hours || 0)} h</div>
                               </>
@@ -2136,7 +2139,7 @@ export default function App() {
                             {item.category === 'DOPRAVA' && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Vzdálenost (km)</label>
-                                <input type="number" onFocus={handleNumericFocus} value={!item.km ? '' : item.km} placeholder="0" onChange={(e) => updateItem(item.id, { km: Number(e.target.value) })} className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
+                                <input type="number" onFocus={handleNumericFocus} value={item.km === 0 ? '' : item.km} placeholder="0" onChange={(e) => updateItem(item.id, { km: Number(e.target.value) })} className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
                               </div>
                             )}
 
@@ -2158,8 +2161,8 @@ export default function App() {
                                     type="number" 
                                     step="0.1"
                                     onFocus={handleNumericFocus}
-                                    value={!item.coefficient ? '' : item.coefficient}
-                                    placeholder="?" 
+                                    value={!item.coefficient && item.coefficient !== 0 ? '' : item.coefficient}
+                                    placeholder="0" 
                                     onChange={(e) => updateItem(item.id, { coefficient: Number(e.target.value) })}
                                     className="w-12 text-center text-[10px] p-0 border-b border-slate-200 bg-transparent focus:ring-0"
                                   />
@@ -2170,7 +2173,7 @@ export default function App() {
                             {(['OTHER', 'TAHOKOV', 'LAKOVANI_MOKRE', 'LAKOVANI_PRASKOVE', 'ZINEK_GALVANICKY'].includes(item.category)) && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Množství (MJ)</label>
-                                <input type="number" onFocus={handleNumericFocus} value={!item.quantity ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
+                                <input type="number" onFocus={handleNumericFocus} value={item.quantity === 0 ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
                               </div>
                             )}
                           </div>
@@ -2184,7 +2187,7 @@ export default function App() {
                             <input 
                               type="number"
                               onFocus={handleNumericFocus}
-                              value={!item.pricePerUnit ? '' : item.pricePerUnit}
+                              value={item.pricePerUnit === 0 ? '' : item.pricePerUnit}
                               placeholder="0"
                               onChange={(e) => updateItem(item.id, { pricePerUnit: Number(e.target.value) })}
                               className="w-full text-right bg-transparent border-none p-0 focus:ring-0 tabular-nums font-medium"
@@ -2232,6 +2235,7 @@ export default function App() {
                 onChange={(e) => {
                   const val = e.target.value;
                   const lines = val.split('\n');
+                  
                   const limitedLines = lines.slice(0, 10).map(line => line.substring(0, 80));
                   updateOffer({ notes: limitedLines.join('\n') });
                 }}
@@ -2510,7 +2514,7 @@ export default function App() {
                     const draftOffer = { ...offer, status: 'DRAFT' };
                     setOffer(draftOffer as Offer);
                     if (!user) {
-                      addToast("Pro uložení se musíte nejdříve přihlásit.", 'info');
+                      addToast("Pro uložení se musíte nejdříve přihlásit (tlačítko vlevo dole).", 'info');
                       signIn();
                       return;
                     }
@@ -2619,7 +2623,8 @@ export default function App() {
                     <input 
                       type="number" 
                       onFocus={handleNumericFocus}
-                      value={calcLength || ''} 
+                      value={calcLength === 0 ? '' : calcLength} 
+                      placeholder="0"
                       onChange={(e) => setCalcLength(Number(e.target.value))}
                       className="w-24 text-right text-sm font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
@@ -2629,7 +2634,8 @@ export default function App() {
                     <input 
                       type="number" 
                       onFocus={handleNumericFocus}
-                      value={calcWidth || ''} 
+                      value={calcWidth === 0 ? '' : calcWidth} 
+                      placeholder="0"
                       onChange={(e) => setCalcWidth(Number(e.target.value))}
                       className="w-24 text-right text-sm font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
@@ -2645,7 +2651,8 @@ export default function App() {
                       <input 
                         type="number" 
                         onFocus={handleNumericFocus}
-                        value={calcNeeded || ''} 
+                        value={calcNeeded === 0 ? '' : calcNeeded} 
+                        placeholder="0"
                         onChange={(e) => setCalcNeeded(Number(e.target.value))}
                         className="w-24 text-right text-sm font-bold bg-white border border-blue-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
                       />
@@ -2971,7 +2978,7 @@ export default function App() {
                   <button 
                     onClick={async () => {
                       if (!user) {
-                        addToast("Pro uložení se musíte nejdříve přihlásit.", 'info');
+                        addToast("Pro uložení se musíte přihlásit.", 'info');
                         signIn();
                         return;
                       }
