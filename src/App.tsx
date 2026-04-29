@@ -4,7 +4,6 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import html2pdf from 'html2pdf.js';
 import { 
   FileText, 
   History, 
@@ -18,13 +17,11 @@ import {
   X, 
   Sparkles, 
   Calendar, 
-  CreditCard,
   User,
   UserPlus,
   RefreshCcw,
   Menu,
   Search,
-  Building,
   Settings,
   StickyNote,
   Tag,
@@ -39,14 +36,15 @@ import {
   Unlock,
   LayoutDashboard,
   Clock,
-  FileSignature,
   CheckCircle,
   AlertTriangle,
   Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI } from "@google/genai";
 import { useSupabase } from './hooks/useSupabase';
+
+// Import loga přímo ze složky src - zajistí správnou cestu po buildu
+import logoImg from './logo.png';
 
 // Types
 type ItemCategory = 
@@ -180,7 +178,7 @@ const INITIAL_OFFER: Offer = {
     name: 'Solar Systems s.r.o.',
     idNumber: '12345678',
     dic: 'CZ12345678',
-    address: 'Průmyslová 12, Praha 10',
+    address: 'Průmyslová 12\nPraha 10, 100 00 Praha',
   },
   items: [
     {
@@ -244,8 +242,6 @@ const parseSpreadsheetData = (text: string) => {
   const allLines = text.split(/\r?\n/).filter(line => line.trim() !== '');
   if (allLines.length === 0) return { items: [], headers: [] };
 
-  // Detect delimiter by counting occurrences in headers
-  // We check for Tab, Semicolon, and Comma
   const headerLine = allLines[0];
   const tabCount = (headerLine.match(/\t/g) || []).length;
   const semicolonCount = (headerLine.match(/;/g) || []).length;
@@ -255,24 +251,16 @@ const parseSpreadsheetData = (text: string) => {
   if (tabCount > 0 && tabCount >= semicolonCount && tabCount >= commaCount) delimiter = '\t';
   else if (semicolonCount > 0 && semicolonCount >= commaCount) delimiter = ';';
 
-  console.log(`Detected delimiter: ${delimiter === '\t' ? 'TAB' : delimiter} (Tabs: ${tabCount}, Semicolons: ${semicolonCount}, Commas: ${commaCount})`);
-
   const rawHeaders = headerLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
   const headers = rawHeaders.map(h => h.toLowerCase());
   
-  // Try to find indices based on keywords
   const titleIdx = headers.findIndex(h => h.includes('název') || h.includes('item') || h.includes('name') || h.includes('položka') || h.includes('výrobek'));
   const unitIdx = headers.findIndex(h => h.includes('mj') || h.includes('unit') || h.includes('jednotka'));
   const priceIdx = headers.findIndex(h => h.includes('cena') || h.includes('price') || h.includes('maloobchod') || h.includes('bez dph'));
   const weightIdx = headers.findIndex(h => h.includes('váha') || h.includes('weight') || h.includes('hmotnost') || h.includes('kg'));
 
-  console.log('Header indices:', { titleIdx, unitIdx, priceIdx, weightIdx });
-
   if (titleIdx === -1) {
-    // If we can't find title by keyword, but we have multiple columns, assume first column is title
-    if (rawHeaders.length > 1) {
-      console.warn('Could not find title header by keyword, defaulting to first column');
-    } else {
+    if (rawHeaders.length === 1) {
       return { items: [], headers: rawHeaders };
     }
   }
@@ -282,13 +270,10 @@ const parseSpreadsheetData = (text: string) => {
   
   for (let i = 1; i < allLines.length; i++) {
     const cols = allLines[i].split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
-    
-    // Pick the best index for title
     const tIdx = titleIdx !== -1 ? titleIdx : 0;
     
     if (!cols[tIdx]) continue;
     
-    // Parse price and weight, handling European decimal comma
     const rawPrice = priceIdx !== -1 ? cols[priceIdx] : '';
     const rawWeight = weightIdx !== -1 ? cols[weightIdx] : '';
     
@@ -304,14 +289,13 @@ const parseSpreadsheetData = (text: string) => {
     });
   }
   
-  console.log(`Parsed ${items.length} items from spreadsheet`);
   return { items, headers: rawHeaders };
 };
 
 export default function App() {
   const { 
     user, 
-    loading: firebaseLoading, 
+    loading: supabaseLoading, 
     signIn, 
     logOut, 
     offers, 
@@ -320,14 +304,13 @@ export default function App() {
     saveOffer, 
     deleteOffer, 
     softDeleteOffer, 
-    saveSettings,
-    isAdmin 
-  } = useSupabase(); // ZMĚNĚNO Z useFirebase
+    saveSettings
+  } = useSupabase(); 
+
   const [offer, setOffer] = useState<Offer>(() => {
     const saved = localStorage.getItem('cenotvurce_current_offer');
     if (saved) {
       const parsed = JSON.parse(saved) as Offer;
-      // Migration: Ensure all items have a category
       parsed.items = parsed.items.map(item => ({
         ...item,
         category: item.category || 'OTHER'
@@ -402,7 +385,7 @@ export default function App() {
   
   // Sort State
   const [sortConfig, setSortConfig] = useState<{
-    key: 'date' | 'client' | 'title' | 'number' | 'amount';
+    key: 'date' | 'client' | 'title' | 'number' | 'amount' | 'preparedBy';
     direction: 'asc' | 'desc';
   }>({ key: 'date', direction: 'desc' });
 
@@ -451,10 +434,9 @@ export default function App() {
     const now = Date.now();
     
     if (now - lastSync > ONE_WEEK) {
-      console.log("Starting automated weekly sync...");
       syncPriceList();
     }
-  }, [sheetUrl]); // Check on mount if URL exists
+  }, [sheetUrl]);
 
   const sortedOffers = useMemo(() => {
     let filtered = activeMainView === 'DRAFTS' 
@@ -485,6 +467,10 @@ export default function App() {
           valA = (a.number || '').toLowerCase();
           valB = (b.number || '').toLowerCase();
           break;
+        case 'preparedBy':
+          valA = (a.preparedBy || '').toLowerCase();
+          valB = (b.preparedBy || '').toLowerCase();
+          break;
         case 'amount':
           valA = calculateTotal(a.items);
           valB = calculateTotal(b.items);
@@ -499,14 +485,14 @@ export default function App() {
     return sorted;
   }, [offers, activeMainView, sortConfig]);
 
-  const toggleSort = (key: 'date' | 'client' | 'title' | 'number' | 'amount') => {
+  const toggleSort = (key: 'date' | 'client' | 'title' | 'number' | 'amount' | 'preparedBy') => {
     setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
     }));
   };
 
-  const SortIndicator = ({ column }: { column: 'date' | 'client' | 'title' | 'number' | 'amount' }) => {
+  const SortIndicator = ({ column }: { column: 'date' | 'client' | 'title' | 'number' | 'amount' | 'preparedBy' }) => {
     if (sortConfig.key !== column) return null;
     return sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
   };
@@ -536,20 +522,102 @@ export default function App() {
   };
 
   const searchAres = async (q: string) => {
-    if (!q || q.length < 3) {
+    const query = q.trim();
+    if (!query || query.length < 3) {
       setAresResults([]);
       return;
     }
     
     setIsAresSearching(true);
     try {
-      const response = await fetch('/api/ares/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q })
-      });
-      const data = await response.json();
-      setAresResults(Array.isArray(data) ? data : []);
+      const isIco = /^\d+$/.test(query);
+      let mappedResults = [];
+
+      const mapAresAddress = (s: any) => {
+          const sidlo = s.sidlo || {};
+          
+          const ulice = sidlo.nazevUlice || sidlo.nazevObce || '';
+          const cisloDom = sidlo.cisloDomovni || '';
+          const cisloOr = sidlo.cisloOrientacni || '';
+          
+          let cislo = '';
+          if (cisloDom && cisloOr) cislo = `${cisloDom}/${cisloOr}`;
+          else if (cisloDom) cislo = `${cisloDom}`;
+          else if (cisloOr) cislo = `${cisloOr}`;
+          
+          let radek1 = ulice;
+          if (ulice && cislo && !ulice.includes(cislo.toString())) {
+            radek1 = `${ulice} ${cislo}`;
+          } else if (!ulice && cislo) {
+            radek1 = cislo;
+          }
+
+          let psc = (sidlo.psc || sidlo.kodPsc || '').toString();
+          if (psc.length === 5) psc = psc.replace(/(\d{3})(\d{2})/, '$1 $2');
+          
+          const obec = sidlo.nazevObce || '';
+          const castObce = sidlo.nazevCastiObce || '';
+          const mestskaCast = sidlo.nazevMestskeCastiObvodu || '';
+          
+          const mestoFinal = mestskaCast && mestskaCast !== obec ? mestskaCast : obec;
+
+          let radek2Parts = [];
+          if (castObce && castObce !== mestoFinal && castObce !== obec) {
+              radek2Parts.push(castObce);
+          }
+          if (psc || mestoFinal) {
+              radek2Parts.push(`${psc} ${mestoFinal}`.trim());
+          }
+          
+          let radek2 = radek2Parts.join(', ');
+
+          if (!radek1 && !radek2 && sidlo.textAdresy) {
+            return sidlo.textAdresy;
+          }
+
+          return `${radek1}\n${radek2}`.trim();
+      };
+
+      if (isIco) {
+        const response = await fetch(`https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${query}`);
+        if (response.ok) {
+          const s = await response.json();
+          mappedResults = [{
+            obchodniJmeno: s.obchodniJmeno,
+            ico: s.ico,
+            dic: s.dic || s.dicSkDph || '', 
+            address: {
+              full: mapAresAddress(s),
+              mesto: s.sidlo?.nazevObce || ''
+            }
+          }];
+        }
+      } else {
+        const response = await fetch('https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ obchodniJmeno: query })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const subjekty = data.ekonomickeSubjekty || [];
+          mappedResults = subjekty.map((s: any) => ({
+            obchodniJmeno: s.obchodniJmeno,
+            ico: s.ico,
+            dic: s.dic || s.dicSkDph || '',
+            address: {
+              full: mapAresAddress(s),
+              mesto: s.sidlo?.nazevObce || ''
+            }
+          }));
+        }
+      }
+
+      setAresResults(mappedResults);
     } catch (error) {
       console.error("ARES Search Error:", error);
       setAresResults([]);
@@ -587,7 +655,6 @@ export default function App() {
     }
   };
 
-  // Global Context derived from labels
   const totalMaterialWeight = useMemo(() => {
     return offer.items
       .filter(i => i.category === 'MATERIAL')
@@ -600,7 +667,6 @@ export default function App() {
       .reduce((sum, i) => sum + (i.quantity * i.pricePerUnit), 0);
   }, [offer.items]);
 
-  // Item Specific Calculations
   const getItemTotal = (item: OfferItem): number => {
     switch (item.category) {
       case 'MATERIAL':
@@ -612,19 +678,15 @@ export default function App() {
         return item.quantity * item.pricePerUnit;
       
       case 'ZINEK_ZAROVY':
-        // kilo se berou dle množství materiálu
         return totalMaterialWeight * item.pricePerUnit;
       
       case 'MONTAZ':
-        // osoby * hodiny * sazba
         return (item.persons || 1) * (item.hours || 0) * item.pricePerUnit;
       
       case 'DOPRAVA':
-        // km * sazba
         return (item.km || 0) * item.pricePerUnit;
       
       case 'PRACE':
-        // (cena materiálu * koeficient) - cena materiálu
         return (totalMaterialPrice * (item.coefficient || 1)) - totalMaterialPrice;
       
       default:
@@ -640,50 +702,12 @@ export default function App() {
     return price.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Kč';
   };
 
-  useEffect(() => {
-    if (!firebaseLoading && user && offers.length > 0) {
-      const isMigrated = localStorage.getItem('offers_sequential_migrated_v1');
-      if (!isMigrated) {
-        // ... (existing logic)
-        localStorage.setItem('offers_sequential_migrated_v1', 'true');
-      }
-
-      // One-off fix for Karlik
-      const isRenumberedDrafts = localStorage.getItem('drafts_renumbered_2026_002_003');
-      if (!isRenumberedDrafts) {
-        const drafts = offers.filter(o => o.status === 'DRAFT' || !o.status);
-        const sortedDrafts = [...drafts].sort((a, b) => {
-          const ta = a.createdAt?.seconds || 0;
-          const tb = b.createdAt?.seconds || 0;
-          return ta - tb;
-        });
-
-        const updates: any[] = [];
-        if (sortedDrafts[0] && sortedDrafts[0].number !== '#2026-002') {
-          updates.push({ ...sortedDrafts[0], number: '#2026-002' });
-        }
-        if (sortedDrafts[1] && sortedDrafts[1].number !== '#2026-003') {
-          updates.push({ ...sortedDrafts[1], number: '#2026-003' });
-        }
-
-        if (updates.length > 0) {
-          Promise.all(updates.map(u => saveOffer(u))).then(() => {
-            localStorage.setItem('drafts_renumbered_2026_002_003', 'true');
-          });
-        } else {
-          localStorage.setItem('drafts_renumbered_2026_002_003', 'true');
-        }
-      }
-    }
-  }, [firebaseLoading, user, offers, saveOffer]);
-
   const tax = useMemo(() => {
     return (subtotal * offer.taxRate) / 100;
   }, [subtotal, offer.taxRate]);
 
   const total = subtotal + tax;
 
-  // Handlers
   const addItem = (category: ItemCategory = 'OTHER') => {
     const newItem: OfferItem = {
       id: generateId(),
@@ -695,7 +719,6 @@ export default function App() {
       pricePerUnit: 0,
     };
 
-    // Apply defaults based on category
     if (category === 'ZINEK_ZAROVY') {
       newItem.title = 'Zinek žárový';
       newItem.unit = 'kg';
@@ -755,7 +778,6 @@ export default function App() {
     const currentYear = new Date().getFullYear();
     const prefix = `#${currentYear}-`;
     
-    // Ignore DELETED offers for numbering purposes
     const currentYearOffers = offers.filter(o => o.number?.startsWith(prefix) && o.status !== 'DELETED');
     
     if (currentYearOffers.length === 0) {
@@ -767,7 +789,6 @@ export default function App() {
       if (parts.length > 1) {
         const numPart = parts[1];
         const num = parseInt(numPart, 10);
-        // Ignore likely random collisions from old generation logic (numbers > 999)
         return (isNaN(num) || num > 999) ? 0 : num;
       }
       return 0;
@@ -786,6 +807,7 @@ export default function App() {
       number: generateNextOfferNumber(),
       client: { ...EMPTY_OFFER.client },
       items: [],
+      preparedBy: preparers.length > 0 ? preparers[0] : '', 
       groupTaxRates: { ...EMPTY_OFFER.groupTaxRates }
     });
     setIsEditorLocked(false);
@@ -807,18 +829,12 @@ export default function App() {
   };
 
   const requestNavigation = (targetView: 'DASHBOARD' | 'EDITOR' | 'DRAFTS' | 'COMPLETED' | 'DELETED' | 'NEW_OFFER') => {
-    // Intercept if in EDITOR, not locked, and clicking anywhere else
     if (activeMainView === 'EDITOR' && !isEditorLocked && targetView !== 'EDITOR') {
       setPendingNavigation(targetView);
       setShowNewOfferConfirm(true);
     } else {
       executeNavigation(targetView);
     }
-  };
-
-  // Keep compatibility variable for exact clicks 
-  const handleNewOfferClick = () => {
-    requestNavigation('NEW_OFFER');
   };
 
   const resetOffer = (skipConfirm: boolean = false) => {
@@ -829,25 +845,7 @@ export default function App() {
     }
   };
 
-  // Handle Save to Cloud
-  const handleCloudSave = async () => {
-    if (!user) {
-      addToast("Pro ukládání do cloudu se musíte nejdříve přihlásit.", 'error');
-      signIn();
-      return;
-    }
-    try {
-      await saveOffer(offer);
-      addToast("Nabídka byla úspěšně uložena do cloudu.", 'success');
-    } catch (e) {
-      console.error("Cloud save failed", e);
-      addToast("Chyba při ukládání do cloudu.", 'error');
-    }
-  };
-
-  // Sync with Firestore Settings
   useEffect(() => {
-    // Apply user settings first
     if (userSettings) {
       setPreparers(prev => userSettings.preparers && JSON.stringify(prev) !== JSON.stringify(userSettings.preparers) ? userSettings.preparers : prev);
       setDefaultValidityDays(prev => userSettings.defaultValidityDays !== undefined && prev !== userSettings.defaultValidityDays ? userSettings.defaultValidityDays : prev);
@@ -858,7 +856,6 @@ export default function App() {
       }
     }
     
-    // Global settings (broadcasted by admin) take priority for shared resources
     if (globalSettings) {
       if (globalSettings.sheetUrl) {
          setSheetUrl(prev => prev !== globalSettings.sheetUrl ? globalSettings.sheetUrl : prev);
@@ -866,7 +863,6 @@ export default function App() {
     }
   }, [userSettings, globalSettings]);
 
-  // Sync settings to cloud when changed
   useEffect(() => {
     if (user && userSettings) {
       const needsSave = 
@@ -886,9 +882,49 @@ export default function App() {
     }
   }, [preparers, defaultValidityDays, sheetUrl, lastSync, user, userSettings]);
 
+  if (supabaseLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+         <RefreshCcw className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+               <FileText className="w-8 h-8" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">Cenotvor</h1>
+          <p className="text-center text-slate-500 text-sm mb-8">Přihlaste se pro přístup ke svým cenovým nabídkám.</p>
+
+          <button 
+            onClick={signIn}
+            className="w-full py-3 bg-white text-slate-700 border border-slate-200 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+               <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+               <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+               <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+             </svg>
+             Přihlásit se přes Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleNumericFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.select();
+  };
+
   return (
     <div className="flex h-screen w-full overflow-hidden font-sans text-slate-800 antialiased bg-slate-50 relative">
-      {/* Sidebar Overlay for Mobile */}
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div 
@@ -901,7 +937,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-[70] w-64 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 
         transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:z-auto
@@ -979,22 +1014,19 @@ export default function App() {
         </nav>
         
         <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900/50">
-          {user ? (
+          {user && (
             <>
               <div className="flex items-center gap-3 px-3 mb-4">
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName || ''} className="w-full h-full object-cover" />
+                  {user.user_metadata?.avatar_url ? (
+                    <img src={user.user_metadata.avatar_url} alt={user.email || ''} className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-4 h-4 text-slate-400" />
                   )}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-medium text-white leading-none truncate flex items-center gap-1.5">
-                    {user.displayName || 'Uživatel'}
-                    {user.email === 'krasnykarlik@gmail.com' && (
-                      <span className="bg-emerald-500/20 text-emerald-400 text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-bold">SU</span>
-                    )}
+                    {user.user_metadata?.full_name || 'Přihlášen'}
                   </span>
                   <span className="text-[10px] text-slate-500 mt-1 truncate">{user.email}</span>
                 </div>
@@ -1006,23 +1038,13 @@ export default function App() {
                 Odhlásit se
               </button>
             </>
-          ) : (
-            <button 
-              onClick={signIn}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors text-xs font-bold"
-            >
-              <User className="w-4 h-4" />
-              Přihlásit se
-            </button>
           )}
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {showExportPreview ? (
           <div className="flex-1 flex flex-col bg-slate-100 overflow-hidden">
-            {/* Export Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shrink-0 relative z-10">
               <div className="flex items-center gap-3">
                 <button 
@@ -1042,15 +1064,10 @@ export default function App() {
                     try {
                       setIsGeneratingPDF(true);
                       
-                      // CRITICAL: Scroll to top and wait for UI to settle
-                      window.scrollTo(0, 0);
-                      await new Promise(resolve => setTimeout(resolve, 100));
-
-                      // Update status to COMPLETED locally
                       const completedOffer = { ...offer, status: 'COMPLETED' as const };
                       setOffer(completedOffer);
+                      setIsEditorLocked(true); 
                       
-                      // Save to cloud if authenticated
                       if (user) {
                         try {
                           await saveOffer(completedOffer);
@@ -1059,63 +1076,82 @@ export default function App() {
                         }
                       }
                       
-                      // Fallback to natively bulletproof browser printing
-                      // 1) Isolate the exact element we want without touching its original DOM position
                       const originalElement = pdfRef.current;
-                      if (!originalElement) return;
+                      if (!originalElement) {
+                        setIsGeneratingPDF(false);
+                        return;
+                      }
 
-                      // Create isolated print container
-                      const printContainer = document.createElement('div');
-                      printContainer.style.width = '210mm';
-                      printContainer.style.background = 'white';
-                      // Match the print styles we had previously applied with Tailwind
-                      printContainer.style.margin = '0 auto';
+                      // NATIVE BROWSER PRINT LOGIC
+                      const originalTitle = document.title;
+                      const cleanNumber = offer.number.replace('#', '');
+                      document.title = `CN_${cleanNumber}`;
+
+                      const style = document.createElement('style');
+                      style.innerHTML = `
+                        @media print {
+                          body > :not(#print-mount) {
+                            display: none !important;
+                          }
+                          #print-mount {
+                            display: block !important;
+                            position: absolute;
+                            left: 0;
+                            top: 0;
+                            width: 210mm;
+                            background: white;
+                          }
+                          @page {
+                            size: A4 portrait;
+                            margin: 0mm;
+                          }
+                          * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                          }
+                        }
+                      `;
+                      document.head.appendChild(style);
+
+                      const printMount = document.createElement('div');
+                      printMount.id = 'print-mount';
                       
                       const clone = originalElement.cloneNode(true) as HTMLElement;
-                      // Strip shadow for printing
-                      clone.className = clone.className.replace(/shadow-\[.*?\]/g, '').replace('shadow-md', '').replace('shadow-lg', '');
+                      clone.classList.remove('shadow-[0_4px_30px_rgba(0,0,0,0.05)]');
+                      clone.classList.remove('min-h-[297mm]');
                       clone.style.boxShadow = 'none';
-                      // Strip explicit max width so it fills container
-                      clone.className = clone.className.replace('max-w-[210mm]', 'w-full');
                       
-                      printContainer.appendChild(clone);
-                      document.body.appendChild(printContainer);
+                      printMount.appendChild(clone);
+                      document.body.appendChild(printMount);
 
-                      try {
-                        // Let browser paint
-                        setTimeout(() => {
-                           window.print();
-                           // Cleanup after print dialog closes
-                           setTimeout(() => {
-                             if (document.body.contains(printContainer)) {
-                               document.body.removeChild(printContainer);
-                             }
-                           }, 100);
-                        }, 250);
-                      } catch (err) {
-                        console.error("Print generation failed:", err);
-                        addToast('Tisk selhal. Zkuste to prosím znovu.', 'error');
-                        if (document.body.contains(printContainer)) {
-                           document.body.removeChild(printContainer);
+                      setTimeout(() => {
+                        window.print();
+                        
+                        document.title = originalTitle;
+                        if (document.body.contains(printMount)) {
+                          document.body.removeChild(printMount);
                         }
-                      }
+                        if (document.head.contains(style)) {
+                          document.head.removeChild(style);
+                        }
+                        setIsGeneratingPDF(false);
+                      }, 150);
+
                     } catch (err) {
-                      console.error("PDF generation failed:", err);
-                      addToast('Generování PDF selhalo. Zkuste to prosím znovu.', 'error');
-                    } finally {
+                      console.error("Print generation failed:", err);
+                      addToast('Generování tisku selhalo. Zkuste to prosím znovu.', 'error');
                       setIsGeneratingPDF(false);
                     }
                   }}
                   className={`px-4 py-2 text-white text-sm font-bold rounded-lg flex items-center gap-2 hover:opacity-90 transition-all shadow-sm ${isGeneratingPDF ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 overflow-hidden relative'}`}
                 >
-                  <FileDown className={`w-4 h-4 ${isGeneratingPDF ? 'animate-bounce' : ''}`} />
-                  {isGeneratingPDF ? 'Generuji...' : 'Stáhnout PDF'}
+                  <Printer className={`w-4 h-4 ${isGeneratingPDF ? 'animate-pulse' : ''}`} />
+                  {isGeneratingPDF ? 'Příprava...' : 'Vytisknout / PDF'}
                 </button>
               </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 lg:p-8 flex justify-center bg-slate-50 print:bg-white print:p-0">
-              {/* Paper Layout */}
               <div 
                 ref={pdfRef}
                 id="pdf-layout-container"
@@ -1139,6 +1175,7 @@ export default function App() {
                         </td>
                       </tr>
                       <tr>
+                        {/* ZHOTOVITEL */}
                         <td className="w-1/2 p-2 align-top border-r border-black" style={{ height: '160px' }}>
                           <div className="flex justify-between gap-2">
                             <div className="text-[12px] text-black space-y-0 leading-tight">
@@ -1146,47 +1183,49 @@ export default function App() {
                               <p>K Hrnčířům 323</p>
                               <p>Šeberov, 149 00 Praha 4</p>
                               
-                              <div className="py-2 space-y-0 text-black">
+                              <div className="h-3"></div>
+
+                              <div className="space-y-0 text-black">
                                 <p><span className="font-bold">IČO:</span> 06279589</p>
                                 <p><span className="font-bold">DIČ:</span> CZ06279589</p>
                                 <p className="font-bold">Plátce DPH</p>
                               </div>
 
-                              <div className="space-y-0 pt-1 text-black text-[11px]">
+                              <div className="space-y-0 pt-2 text-black text-[11px]">
                                 <p><span className="font-bold uppercase">TELEFON:</span> +420 774 214 607</p>
                                 <p><span className="font-bold uppercase">E-MAIL:</span> rohlik-vyroba@seznam.cz</p>
                                 <p><span className="font-bold uppercase">WEB:</span> https://www.kovorohlik.cz/</p>
                               </div>
                             </div>
-                            <img src="/logo.png" alt="Logo" className="h-[84px] w-auto max-w-[160px] object-contain self-start shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            <img 
+                              src={logoImg}
+                              alt="Logo" 
+                              className="h-[100px] w-auto max-w-[160px] object-contain self-start shrink-0" 
+                            />
                           </div>
                         </td>
+
+                        {/* OBJEDNATEL */}
                         <td className="w-1/2 p-2 align-top border-black" style={{ height: '160px' }}>
                           <div className="text-[12px] text-black space-y-0 leading-tight">
-                            <p className="font-bold text-black mb-0.5">{offer.client.name}</p>
-                            <div className="whitespace-pre-line">
-                              {(() => {
-                                if (!offer.client.address) return "—";
-                                const parts = offer.client.address.split(/[,;]\s*/).map(p => p.trim()).filter(Boolean);
-                                if (parts.length >= 2) {
-                                  return (
-                                    <>
-                                      <p>{parts[0]}</p>
-                                      <p>{parts.slice(1).join(', ')}</p>
-                                    </>
-                                  );
-                                }
-                                return <p>{offer.client.address}</p>;
-                              })()}
+                            <p className="font-bold text-black mb-0.5">{offer.client.name || "—"}</p>
+                            
+                            <div className="leading-tight">
+                              {offer.client.address ? offer.client.address.split('\n').map((line, i) => (
+                                <p key={i}>{line}</p>
+                              )) : <p>—</p>}
                             </div>
                             
-                            <div className="py-2 space-y-0 text-black">
-                              {offer.client.idNumber && (
+                            <div className="h-3"></div>
+                            
+                            <div className="space-y-0 text-black">
+                              {offer.client.idNumber ? (
                                  <p><span className="font-bold">IČO:</span> {offer.client.idNumber}</p>
-                              )}
-                              {offer.client.dic && (
+                              ) : <p><span className="font-bold">IČO:</span> —</p>}
+                              
+                              {offer.client.dic ? (
                                  <p><span className="font-bold">DIČ:</span> {offer.client.dic}</p>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         </td>
@@ -1252,8 +1291,6 @@ export default function App() {
                         const taxAmount = sumBase * (rate / 100);
                         const totalWithTax = sumBase + taxAmount;
                         
-                        const isLast = idx === arr.length - 1;
-
                         return (
                           <tr key={group.key} className="group">
                             <td className="py-2.5 px-6 font-semibold text-black border-b border-black">{group.label}</td>
@@ -1290,7 +1327,6 @@ export default function App() {
                         );
                       })}
                       
-                      {/* Subtotal Row - Cleaner */}
                       <tr className="bg-[#f1f5f9]">
                         <td className="py-2.5 px-6 text-[10px] font-bold text-black uppercase tracking-widest border-b border-black">Celkový součet</td>
                         <td className="py-2.5 px-6 text-right text-black font-bold text-[12px] tabular-nums border-b border-black">
@@ -1348,7 +1384,6 @@ export default function App() {
                     )}
                   </div>
                   
-                  {/* Dividing line at a fixed vertical offset - matching top header style and spacing */}
                   <div className="border-b border-black mt-2 mb-2 px-2"></div>
                 </div>
 
@@ -1420,8 +1455,6 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Removed footer content to ensure single page and better alignment */}
                 </div>
 
               </div>
@@ -1578,6 +1611,15 @@ export default function App() {
                             </div>
                           </th>
                           <th 
+                            className="px-6 py-4 font-bold cursor-pointer hover:bg-slate-100 transition-colors"
+                            onClick={() => toggleSort('preparedBy' as any)}
+                          >
+                            <div className="flex items-center">
+                              Vyhotovil
+                              <SortIndicator column="preparedBy" />
+                            </div>
+                          </th>
+                          <th 
                             className="px-6 py-4 font-bold text-right cursor-pointer hover:bg-slate-100 transition-colors"
                             onClick={() => toggleSort('amount')}
                           >
@@ -1658,6 +1700,11 @@ export default function App() {
                               <td className="px-6 py-4 cursor-pointer" onClick={handleRowClick}>
                                 <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
                                   {o.number || '---'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 cursor-pointer" onClick={handleRowClick}>
+                                <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                                  {o.preparedBy || '---'}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-right cursor-pointer" onClick={handleRowClick}>
@@ -1816,10 +1863,8 @@ export default function App() {
         )}
 
         <div className="flex-1 p-4 lg:p-8 flex flex-col xl:flex-row gap-8 items-start overflow-y-auto min-h-0 text-slate-900">
-          {/* Left Column: Items + Notes */}
           <div className="w-full xl:w-2/3 2xl:w-3/4 space-y-6 flex flex-col shrink-0 min-w-0">
             <fieldset disabled={isEditorLocked} className="space-y-6 m-0 p-0 border-none min-w-0 w-full group/locked">
-            {/* Project Title Section */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/30">
                 <Tag className="w-4 h-4 text-slate-400" />
@@ -1836,7 +1881,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Items Section */}
             <section className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col shrink-0 min-w-0">
             <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -1957,7 +2001,6 @@ export default function App() {
                                       onChange={(e) => updateItem(item.id, { title: e.target.value })}
                                     className="w-full font-medium text-slate-900 bg-transparent border-none p-0 focus:ring-0 placeholder:text-slate-300"
                                   />
-                                  {/* Autocomplete for Material */}
                                   {item.category === 'MATERIAL' && activeAutocompleteId === item.id && (() => {
                                     const searchParts = (item.title || '').toLowerCase().split(/\s+/).filter(Boolean);
                                     const filtered = priceList.filter(p => {
@@ -2057,7 +2100,7 @@ export default function App() {
                               <>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Množství (MJ)</label>
-                                  <input type="number" value={item.quantity || 0} onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <input type="number" onFocus={handleNumericFocus} value={!item.quantity ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-300">×</div>
                                 <div className="flex flex-col items-center">
@@ -2079,12 +2122,12 @@ export default function App() {
                               <>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Lidí</label>
-                                  <input type="number" value={item.persons || 0} onChange={(e) => updateItem(item.id, { persons: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <input type="number" onFocus={handleNumericFocus} value={!item.persons ? '' : item.persons} placeholder="0" onChange={(e) => updateItem(item.id, { persons: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-300">×</div>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Hodin</label>
-                                  <input type="number" value={item.hours || 0} onChange={(e) => updateItem(item.id, { hours: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <input type="number" onFocus={handleNumericFocus} value={!item.hours ? '' : item.hours} placeholder="0" onChange={(e) => updateItem(item.id, { hours: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-400 font-bold">= {(item.persons || 0) * (item.hours || 0)} h</div>
                               </>
@@ -2093,7 +2136,7 @@ export default function App() {
                             {item.category === 'DOPRAVA' && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Vzdálenost (km)</label>
-                                <input type="number" value={item.km || 0} onChange={(e) => updateItem(item.id, { km: Number(e.target.value) })} className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
+                                <input type="number" onFocus={handleNumericFocus} value={!item.km ? '' : item.km} placeholder="0" onChange={(e) => updateItem(item.id, { km: Number(e.target.value) })} className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
                               </div>
                             )}
 
@@ -2114,6 +2157,7 @@ export default function App() {
                                   <input 
                                     type="number" 
                                     step="0.1"
+                                    onFocus={handleNumericFocus}
                                     value={!item.coefficient ? '' : item.coefficient}
                                     placeholder="?" 
                                     onChange={(e) => updateItem(item.id, { coefficient: Number(e.target.value) })}
@@ -2126,7 +2170,7 @@ export default function App() {
                             {(['OTHER', 'TAHOKOV', 'LAKOVANI_MOKRE', 'LAKOVANI_PRASKOVE', 'ZINEK_GALVANICKY'].includes(item.category)) && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Množství (MJ)</label>
-                                <input type="number" value={item.quantity || 0} onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
+                                <input type="number" onFocus={handleNumericFocus} value={!item.quantity ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
                               </div>
                             )}
                           </div>
@@ -2139,7 +2183,9 @@ export default function App() {
                           ) : (
                             <input 
                               type="number"
-                              value={item.pricePerUnit || 0}
+                              onFocus={handleNumericFocus}
+                              value={!item.pricePerUnit ? '' : item.pricePerUnit}
+                              placeholder="0"
                               onChange={(e) => updateItem(item.id, { pricePerUnit: Number(e.target.value) })}
                               className="w-full text-right bg-transparent border-none p-0 focus:ring-0 tabular-nums font-medium"
                             />
@@ -2175,7 +2221,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* Notes Section */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/30">
               <StickyNote className="w-4 h-4 text-slate-400" />
@@ -2187,8 +2232,6 @@ export default function App() {
                 onChange={(e) => {
                   const val = e.target.value;
                   const lines = val.split('\n');
-                  
-                  // Limit lines and characters per line
                   const limitedLines = lines.slice(0, 10).map(line => line.substring(0, 80));
                   updateOffer({ notes: limitedLines.join('\n') });
                 }}
@@ -2204,7 +2247,6 @@ export default function App() {
           </fieldset>
         </div>
 
-        {/* Details Sidebar */}
           <div className="w-full xl:w-1/3 2xl:w-1/4 space-y-6 shrink-0 pb-8">
             <fieldset disabled={isEditorLocked} className="space-y-6 m-0 p-0 border-none min-w-0 w-full group/locked">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -2213,7 +2255,6 @@ export default function App() {
                 Zákazník
               </h3>
               <div className="space-y-4">
-                {/* ARES Search and Manual Entry Toggle */}
                 <div className="flex flex-col gap-3">
                   <div className="flex bg-slate-100 p-1 rounded-xl">
                     <button 
@@ -2339,7 +2380,7 @@ export default function App() {
                         value={offer.client.address || ''}
                         placeholder="..."
                         onChange={(e) => updateClient({ address: e.target.value })}
-                        rows={1}
+                        rows={2}
                         className="w-full text-xs text-slate-500 bg-transparent border-none p-0 focus:ring-0 resize-none overflow-hidden placeholder:text-slate-300 leading-relaxed"
                         onInput={(e) => {
                           const target = e.target as HTMLTextAreaElement;
@@ -2467,9 +2508,9 @@ export default function App() {
                 <button 
                   onClick={async () => {
                     const draftOffer = { ...offer, status: 'DRAFT' };
-                    setOffer(draftOffer);
+                    setOffer(draftOffer as Offer);
                     if (!user) {
-                      addToast("Pro uložení se musíte nejdříve přihlásit (tlačítko vlevo dole).", 'info');
+                      addToast("Pro uložení se musíte nejdříve přihlásit.", 'info');
                       signIn();
                       return;
                     }
@@ -2577,6 +2618,7 @@ export default function App() {
                     <span className="text-sm text-slate-600 font-medium tracking-tight">Délka plechu (m):</span>
                     <input 
                       type="number" 
+                      onFocus={handleNumericFocus}
                       value={calcLength || ''} 
                       onChange={(e) => setCalcLength(Number(e.target.value))}
                       className="w-24 text-right text-sm font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
@@ -2586,6 +2628,7 @@ export default function App() {
                     <span className="text-sm text-slate-600 font-medium tracking-tight">Šířka plechu (m):</span>
                     <input 
                       type="number" 
+                      onFocus={handleNumericFocus}
                       value={calcWidth || ''} 
                       onChange={(e) => setCalcWidth(Number(e.target.value))}
                       className="w-24 text-right text-sm font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
@@ -2601,6 +2644,7 @@ export default function App() {
                       <span className="text-sm text-blue-700 font-bold tracking-tight">Potřebuji (m²):</span>
                       <input 
                         type="number" 
+                        onFocus={handleNumericFocus}
                         value={calcNeeded || ''} 
                         onChange={(e) => setCalcNeeded(Number(e.target.value))}
                         className="w-24 text-right text-sm font-bold bg-white border border-blue-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
@@ -2927,7 +2971,7 @@ export default function App() {
                   <button 
                     onClick={async () => {
                       if (!user) {
-                        addToast("Pro uložení se musíte přihlásit.", 'info');
+                        addToast("Pro uložení se musíte nejdříve přihlásit.", 'info');
                         signIn();
                         return;
                       }
