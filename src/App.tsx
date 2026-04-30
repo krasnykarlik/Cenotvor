@@ -44,6 +44,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useSupabase } from './hooks/useSupabase';
 
+// Bezpečný import loga přes Vite
+import logoImg from '/logo.png';
+
 // Types
 type ItemCategory = 
   | 'MATERIAL' 
@@ -1199,7 +1202,7 @@ export default function App() {
                               </div>
                             </div>
                             <img 
-                              src="/Cenotvor/logo.png" 
+                              src={logoImg} 
                               alt="Logo" 
                               className="h-[100px] w-auto max-w-[160px] object-contain self-start shrink-0" 
                             />
@@ -1748,8 +1751,6 @@ export default function App() {
                                               hours: Number(item.hours) || 0,
                                               km: Number(item.km) || 0,
                                               coefficient: Number(item.coefficient) || 0,
-                                              extraInfo: item.extraInfo || '',
-                                              description: item.description || ''
                                             })),
                                             dateIssued: new Date().toISOString().split('T')[0],
                                             validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
