@@ -1198,7 +1198,7 @@ export default function App() {
                               </div>
                             </div>
                             <img 
-                              src="https://krasnykarlik.github.io/Cenotvor/logo.png" 
+                              src="./logo.png" 
                               alt="Logo" 
                               className="h-[100px] w-auto max-w-[160px] object-contain self-start shrink-0" 
                             />
