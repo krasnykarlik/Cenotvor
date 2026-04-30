@@ -248,8 +248,6 @@ const parseSpreadsheetData = (text: string) => {
   if (tabCount > 0 && tabCount >= semicolonCount && tabCount >= commaCount) delimiter = '\t';
   else if (semicolonCount > 0 && semicolonCount >= commaCount) delimiter = ';';
 
-  console.log(`Detected delimiter: ${delimiter === '\t' ? 'TAB' : delimiter} (Tabs: ${tabCount}, Semicolons: ${semicolonCount}, Commas: ${commaCount})`);
-
   const rawHeaders = headerLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
   const headers = rawHeaders.map(h => h.toLowerCase());
   
@@ -658,19 +656,18 @@ export default function App() {
   const totalMaterialWeight = useMemo(() => {
     return offer.items
       .filter(i => i.category === 'MATERIAL')
-      .reduce((sum, i) => sum + (Number(i.quantity) * (Number(i.weightPerUnit) || 0)), 0);
+      .reduce((sum, i) => sum + ((Number(i.quantity) || 0) * (Number(i.weightPerUnit) || 0)), 0);
   }, [offer.items]);
 
   const totalMaterialPrice = useMemo(() => {
     return offer.items
       .filter(i => i.category === 'MATERIAL')
-      .reduce((sum, i) => sum + (Number(i.quantity) * Number(i.pricePerUnit)), 0);
+      .reduce((sum, i) => sum + ((Number(i.quantity) || 0) * (Number(i.pricePerUnit) || 0)), 0);
   }, [offer.items]);
 
   const getItemTotal = (item: OfferItem): number => {
     const q = Number(item.quantity) || 0;
     const p = Number(item.pricePerUnit) || 0;
-    
     switch (item.category) {
       case 'MATERIAL':
       case 'OTHER':
@@ -1201,7 +1198,7 @@ export default function App() {
                               </div>
                             </div>
                             <img 
-                              src="./logo.png" 
+                              src="https://krasnykarlik.github.io/Cenotvor/logo.png" 
                               alt="Logo" 
                               className="h-[100px] w-auto max-w-[160px] object-contain self-start shrink-0" 
                             />
@@ -1237,7 +1234,7 @@ export default function App() {
                   </table>
                 </div>
 
-                {/* Project Title */}
+                {/* Project Title implementation - Using table for max stability */}
                 <div className="px-2 mt-2 mb-6">
                   <table className="w-full border-collapse border border-black border-spacing-0" style={{ tableLayout: 'fixed' }}>
                     <tbody>
@@ -1655,6 +1652,13 @@ export default function App() {
                                   quantity: Number(item.quantity) || 0,
                                   unit: item.unit || 'ks',
                                   pricePerUnit: Number(item.pricePerUnit) || 0,
+                                  weightPerUnit: Number(item.weightPerUnit) || 0,
+                                  persons: Number(item.persons) || 0,
+                                  hours: Number(item.hours) || 0,
+                                  km: Number(item.km) || 0,
+                                  coefficient: Number(item.coefficient) || 0,
+                                  extraInfo: item.extraInfo || '',
+                                  description: item.description || ''
                                 })),
                                 dateIssued: o.dateIssued || new Date().toISOString().split('T')[0],
                                 validUntil: o.validUntil || new Date().toISOString().split('T')[0],
@@ -1738,6 +1742,13 @@ export default function App() {
                                               id: generateId(),
                                               quantity: Number(item.quantity) || 0,
                                               pricePerUnit: Number(item.pricePerUnit) || 0,
+                                              weightPerUnit: Number(item.weightPerUnit) || 0,
+                                              persons: Number(item.persons) || 0,
+                                              hours: Number(item.hours) || 0,
+                                              km: Number(item.km) || 0,
+                                              coefficient: Number(item.coefficient) || 0,
+                                              extraInfo: item.extraInfo || '',
+                                              description: item.description || ''
                                             })),
                                             dateIssued: new Date().toISOString().split('T')[0],
                                             validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -2110,7 +2121,7 @@ export default function App() {
                                   <label className="text-[9px] text-slate-400 uppercase">Kg/MJ</label>
                                   <div className="w-12 text-center text-slate-900 font-medium">{item.weightPerUnit || 0}</div>
                                 </div>
-                                <div className="text-slate-400 font-bold">= {(item.quantity * (item.weightPerUnit || 0)).toFixed(1)} kg</div>
+                                <div className="text-slate-400 font-bold">= {(Number(item.quantity || 0) * (Number(item.weightPerUnit) || 0)).toFixed(1)} kg</div>
                               </>
                             )}
 
@@ -2132,7 +2143,7 @@ export default function App() {
                                   <label className="text-[9px] text-slate-400 uppercase">Hodin</label>
                                   <input type="number" onFocus={handleNumericFocus} value={item.hours === 0 ? '' : item.hours} placeholder="0" onChange={(e) => updateItem(item.id, { hours: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
-                                <div className="text-slate-400 font-bold">= {(item.persons || 0) * (item.hours || 0)} h</div>
+                                <div className="text-slate-400 font-bold">= {(Number(item.persons || 0)) * (Number(item.hours || 0))} h</div>
                               </>
                             )}
 
