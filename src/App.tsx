@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   FileText, 
@@ -1198,7 +1199,7 @@ export default function App() {
                               </div>
                             </div>
                             <img 
-                              src="./logo.png" 
+                              src="/Cenotvor/logo.png" 
                               alt="Logo" 
                               className="h-[100px] w-auto max-w-[160px] object-contain self-start shrink-0" 
                             />
