@@ -1162,12 +1162,16 @@ export default function App() {
                         </td>
                       </tr>
                       <tr>
-                        {/* ZHOTOVITEL */}
+{/* ZHOTOVITEL */}
                         <td className="w-1/2 p-2 align-top border-r border-black relative" style={{ height: '160px' }}>
-                          <div className="text-[12px] text-black space-y-0 leading-tight pr-[160px]">
-                            <p className="font-bold text-black mb-0.5">Kovovýroba Rohlík s.r.o.</p>
-                            <p>K Hrnčířům 323</p>
-                            <p>Šeberov, 149 00 Praha 4</p>
+                          <div className="text-[12px] text-black space-y-0 leading-tight">
+                            
+                            {/* Ochranný padding pouze pro vrchní část vedle loga */}
+                            <div className="pr-[160px]">
+                              <p className="font-bold text-black mb-0.5">Kovovýroba Rohlík s.r.o.</p>
+                              <p>K Hrnčířům 323</p>
+                              <p>Šeberov, 149 00 Praha 4</p>
+                            </div>
                             
                             <div className="h-3"></div>
 
@@ -1177,7 +1181,8 @@ export default function App() {
                               <p className="font-bold">Plátce DPH</p>
                             </div>
 
-                            <div className="space-y-0 pt-2 text-black text-[11px]">
+                            {/* Přidáno whitespace-nowrap proti zalamování dlouhých adres */}
+                            <div className="space-y-0 pt-2 text-black text-[11px] whitespace-nowrap">
                               <p><span className="font-bold uppercase">TELEFON:</span> +420 774 214 607</p>
                               <p><span className="font-bold uppercase">E-MAIL:</span> rohlik-vyroba@seznam.cz</p>
                               <p><span className="font-bold uppercase">WEB:</span> https://www.kovorohlik.cz/</p>
