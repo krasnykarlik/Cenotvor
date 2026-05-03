@@ -1191,7 +1191,7 @@ export default function App() {
                           <img 
                             src={LOGO_BASE64} 
                             alt="Logo" 
-                            className="absolute top-2 right-[40px] h-[60px] w-auto max-w-[120px] object-contain" 
+                            className="absolute top-2 right-[40px] h-[50px] w-auto max-w-[120px] object-contain" 
                           />
                         </td>
 
