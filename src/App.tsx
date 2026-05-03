@@ -44,8 +44,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useSupabase } from './hooks/useSupabase';
 
-// Bezpečný import loga přes Vite
-import logoImg from '/logo.png';
+const LOGO_BASE64 = "data:image/png;base64,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";
 
 // Types
 type ItemCategory = 
@@ -141,9 +140,15 @@ interface Offer {
 const calculateTotal = (offerItems: any[]) => {
   if (!offerItems || offerItems.length === 0) return 0;
   
-  const materials = offerItems.filter(i => i.category === 'MATERIAL');
-  const matWeight = materials.reduce((sum, i) => sum + (Number(i.quantity || 0) * (Number(i.weightPerUnit) || 0)), 0);
-  const matPrice = materials.reduce((sum, i) => sum + (Number(i.quantity || 0) * Number(i.pricePerUnit || 0)), 0);
+  // TAHOKOV se počítá do váhy pro zinek
+  const matWeight = offerItems.reduce((sum, i) => {
+    if (i.category === 'MATERIAL') return sum + (Number(i.quantity || 0) * Number(i.weightPerUnit || 0));
+    if (i.category === 'TAHOKOV') return sum + Number(i.quantity || 0); // U tahokovu je Množství(quantity) přímo hmotnost
+    return sum;
+  }, 0);
+  
+  // TAHOKOV se NEPOČÍTÁ do ceny materiálu pro výpočet koeficientu práce
+  const matPrice = offerItems.filter(i => i.category === 'MATERIAL').reduce((sum, i) => sum + (Number(i.quantity || 0) * Number(i.pricePerUnit || 0)), 0);
 
   return offerItems.reduce((sum, item) => {
     const qty = Number(item.quantity) || 0;
@@ -152,11 +157,12 @@ const calculateTotal = (offerItems: any[]) => {
     switch (item.category) {
       case 'MATERIAL':
       case 'OTHER':
-      case 'TAHOKOV':
       case 'LAKOVANI_MOKRE':
       case 'LAKOVANI_PRASKOVE':
       case 'ZINEK_GALVANICKY':
         return sum + (qty * price);
+      case 'TAHOKOV':
+        return sum + price; // Tady je "price" rovnou finální celková částka, nenásobíme množstvím
       case 'ZINEK_ZAROVY':
         return sum + (matWeight * price);
       case 'MONTAZ':
@@ -169,45 +175,6 @@ const calculateTotal = (offerItems: any[]) => {
         return sum + (qty * price);
     }
   }, 0);
-};
-
-// Initial Data - Dirty placeholder for testing
-const INITIAL_OFFER: Offer = {
-  id: generateId(),
-  number: `#${new Date().getFullYear()}-001`,
-  client: {
-    name: 'Solar Systems s.r.o.',
-    idNumber: '12345678',
-    dic: 'CZ12345678',
-    address: 'Průmyslová 12\nPraha 10, 100 00 Praha',
-  },
-  items: [
-    {
-      id: generateId(),
-      category: 'MATERIAL',
-      title: 'Ocelový profil L 50x50x5',
-      description: 'Konstrukční ocel S235',
-      quantity: 10,
-      unit: 'm',
-      weightPerUnit: 3.77,
-      pricePerUnit: 45,
-    },
-  ],
-  dateIssued: new Date().toISOString().split('T')[0],
-  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  currency: 'CZK',
-  taxRate: 21,
-  status: 'DRAFT',
-  preparedBy: 'Antonín Rohlík ml.',
-  receivedBy: '',
-  notes: '',
-  title: 'Instalace FVE - Rodinný dům',
-  groupTaxRates: {
-    material: 12,
-    surface: 12,
-    assembly: 21,
-    transport: 21,
-  }
 };
 
 // Clean Template for new offers
@@ -236,6 +203,12 @@ const EMPTY_OFFER: Offer = {
     assembly: 21,
     transport: 21,
   }
+};
+
+const INITIAL_OFFER: Offer = {
+  ...EMPTY_OFFER,
+  id: generateId(),
+  number: `#${new Date().getFullYear()}-001`,
 };
 
 // Helper for spreadsheet parsing (handles CSV and TSV)
@@ -659,8 +632,16 @@ export default function App() {
 
   const totalMaterialWeight = useMemo(() => {
     return offer.items
-      .filter(i => i.category === 'MATERIAL')
-      .reduce((sum, i) => sum + ((Number(i.quantity) || 0) * (Number(i.weightPerUnit) || 0)), 0);
+      .filter(i => i.category === 'MATERIAL' || i.category === 'TAHOKOV')
+      .reduce((sum, i) => {
+         if (i.category === 'MATERIAL') {
+            return sum + ((Number(i.quantity) || 0) * (Number(i.weightPerUnit) || 0));
+         }
+         if (i.category === 'TAHOKOV') {
+            return sum + (Number(i.quantity) || 0); // Množství u tahokovu je rovnou hmotnost
+         }
+         return sum;
+      }, 0);
   }, [offer.items]);
 
   const totalMaterialPrice = useMemo(() => {
@@ -675,11 +656,13 @@ export default function App() {
     switch (item.category) {
       case 'MATERIAL':
       case 'OTHER':
-      case 'TAHOKOV':
       case 'LAKOVANI_MOKRE':
       case 'LAKOVANI_PRASKOVE':
       case 'ZINEK_GALVANICKY':
         return q * p;
+      
+      case 'TAHOKOV':
+        return p; // Cena tahokovu se nenásobí množstvím
       
       case 'ZINEK_ZAROVY':
         return totalMaterialWeight * p;
@@ -747,7 +730,7 @@ export default function App() {
       newItem.weightPerUnit = 0;
     } else if (category === 'TAHOKOV') {
       newItem.title = 'Tahokov';
-      newItem.unit = 'kg';
+      newItem.unit = ''; // Prázdná MJ pro Tahokov
     } else if (category === 'LAKOVANI_MOKRE') {
       newItem.title = 'Lakování mokré';
     } else if (category === 'LAKOVANI_PRASKOVE') {
@@ -1180,33 +1163,31 @@ export default function App() {
                       </tr>
                       <tr>
                         {/* ZHOTOVITEL */}
-                        <td className="w-1/2 p-2 align-top border-r border-black" style={{ height: '160px' }}>
-                          <div className="flex justify-between gap-2">
-                            <div className="text-[12px] text-black space-y-0 leading-tight">
-                              <p className="font-bold text-black mb-0.5">Kovovýroba Rohlík s.r.o.</p>
-                              <p>K Hrnčířům 323</p>
-                              <p>Šeberov, 149 00 Praha 4</p>
-                              
-                              <div className="h-3"></div>
+                        <td className="w-1/2 p-2 align-top border-r border-black relative" style={{ height: '160px' }}>
+                          <div className="text-[12px] text-black space-y-0 leading-tight pr-[160px]">
+                            <p className="font-bold text-black mb-0.5">Kovovýroba Rohlík s.r.o.</p>
+                            <p>K Hrnčířům 323</p>
+                            <p>Šeberov, 149 00 Praha 4</p>
+                            
+                            <div className="h-3"></div>
 
-                              <div className="space-y-0 text-black">
-                                <p><span className="font-bold">IČO:</span> 06279589</p>
-                                <p><span className="font-bold">DIČ:</span> CZ06279589</p>
-                                <p className="font-bold">Plátce DPH</p>
-                              </div>
-
-                              <div className="space-y-0 pt-2 text-black text-[11px]">
-                                <p><span className="font-bold uppercase">TELEFON:</span> +420 774 214 607</p>
-                                <p><span className="font-bold uppercase">E-MAIL:</span> rohlik-vyroba@seznam.cz</p>
-                                <p><span className="font-bold uppercase">WEB:</span> https://www.kovorohlik.cz/</p>
-                              </div>
+                            <div className="space-y-0 text-black">
+                              <p><span className="font-bold">IČO:</span> 06279589</p>
+                              <p><span className="font-bold">DIČ:</span> CZ06279589</p>
+                              <p className="font-bold">Plátce DPH</p>
                             </div>
-                            <img 
-                              src={logoImg} 
-                              alt="Logo" 
-                              className="h-[100px] w-auto max-w-[160px] object-contain self-start shrink-0" 
-                            />
+
+                            <div className="space-y-0 pt-2 text-black text-[11px]">
+                              <p><span className="font-bold uppercase">TELEFON:</span> +420 774 214 607</p>
+                              <p><span className="font-bold uppercase">E-MAIL:</span> rohlik-vyroba@seznam.cz</p>
+                              <p><span className="font-bold uppercase">WEB:</span> https://www.kovorohlik.cz/</p>
+                            </div>
                           </div>
+                          <img 
+                            src={LOGO_BASE64} 
+                            alt="Logo" 
+                            className="absolute top-2 right-[40px] h-[60px] w-auto max-w-[120px] object-contain" 
+                          />
                         </td>
 
                         {/* OBJEDNATEL */}
@@ -1269,12 +1250,12 @@ export default function App() {
                         { 
                           label: 'Materiál + výroba', 
                           key: 'material' as const,
-                          categories: ['MATERIAL', 'PRACE', 'OTHER'] 
+                          categories: ['MATERIAL', 'PRACE', 'OTHER', 'TAHOKOV'] 
                         },
                         { 
                           label: 'Povrchová úprava', 
                           key: 'surface' as const,
-                          categories: ['ZINEK_ZAROVY', 'ZINEK_GALVANICKY', 'TAHOKOV', 'LAKOVANI_MOKRE', 'LAKOVANI_PRASKOVE'] 
+                          categories: ['ZINEK_ZAROVY', 'ZINEK_GALVANICKY', 'LAKOVANI_MOKRE', 'LAKOVANI_PRASKOVE'] 
                         },
                         { 
                           label: 'Montáž', 
@@ -1339,8 +1320,8 @@ export default function App() {
                         <td className="py-2.5 px-6 text-center text-black font-bold text-[12px] tabular-nums border-b border-black">
                           {formatPrice(offer.items.reduce((acc, item) => {
                             const mapping: Record<string, keyof NonNullable<Offer['groupTaxRates']>> = {
-                              'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material',
-                              'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'TAHOKOV': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
+                              'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material', 'TAHOKOV': 'material',
+                              'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
                               'MONTAZ': 'assembly',
                               'DOPRAVA': 'transport'
                             };
@@ -1352,8 +1333,8 @@ export default function App() {
                         <td className="py-2.5 px-6 text-right text-black font-bold text-[12px] tabular-nums border-b border-black">
                           {formatPrice(offer.items.reduce((acc, item) => {
                             const mapping: Record<string, keyof NonNullable<Offer['groupTaxRates']>> = {
-                              'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material',
-                              'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'TAHOKOV': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
+                              'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material', 'TAHOKOV': 'material',
+                              'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
                               'MONTAZ': 'assembly',
                               'DOPRAVA': 'transport'
                             };
@@ -1426,8 +1407,8 @@ export default function App() {
                         <span className="text-black font-normal tabular-nums">
                           {formatPrice(offer.items.reduce((acc, item) => {
                             const mapping: Record<string, keyof NonNullable<Offer['groupTaxRates']>> = {
-                              'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material',
-                              'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'TAHOKOV': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
+                              'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material', 'TAHOKOV': 'material',
+                              'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
                               'MONTAZ': 'assembly',
                               'DOPRAVA': 'transport'
                             };
@@ -1444,8 +1425,8 @@ export default function App() {
                           <span className="text-xl font-black text-black tabular-nums tracking-tight">
                             {formatPrice(offer.items.reduce((acc, item) => {
                               const mapping: Record<string, keyof NonNullable<Offer['groupTaxRates']>> = {
-                                'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material',
-                                'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'TAHOKOV': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
+                                'MATERIAL': 'material', 'PRACE': 'material', 'OTHER': 'material', 'TAHOKOV': 'material',
+                                'ZINEK_ZAROVY': 'surface', 'ZINEK_GALVANICKY': 'surface', 'LAKOVANI_MOKRE': 'surface', 'LAKOVANI_PRASKOVE': 'surface',
                                 'MONTAZ': 'assembly',
                                 'DOPRAVA': 'transport'
                               };
@@ -1999,7 +1980,7 @@ export default function App() {
                           <div className="flex flex-col gap-1 group/row">
                               <div className="flex items-center gap-2">
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                                  item.category === 'MATERIAL' ? 'bg-amber-100 text-amber-700' :
+                                  (item.category === 'MATERIAL' || item.category === 'TAHOKOV') ? 'bg-amber-100 text-amber-700' :
                                   item.category === 'MONTAZ' ? 'bg-emerald-100 text-emerald-700' :
                                   item.category === 'DOPRAVA' ? 'bg-purple-100 text-purple-700' :
                                   item.category === 'PRACE' ? 'bg-blue-100 text-blue-700' :
@@ -2011,13 +1992,13 @@ export default function App() {
                                   <input 
                                     type="text"
                                     value={item.title || ''}
-                                    placeholder={item.category === 'MATERIAL' ? "Materiál..." : "Název položky..."}
+                                    placeholder={(item.category === 'MATERIAL' || item.category === 'TAHOKOV') ? "Materiál/Tahokov..." : "Název položky..."}
                                     onFocus={() => setActiveAutocompleteId(item.id)}
                                       onBlur={() => setTimeout(() => setActiveAutocompleteId(null), 200)}
                                       onChange={(e) => updateItem(item.id, { title: e.target.value })}
                                     className="w-full font-medium text-slate-900 bg-transparent border-none p-0 focus:ring-0 placeholder:text-slate-300"
                                   />
-                                  {item.category === 'MATERIAL' && activeAutocompleteId === item.id && (() => {
+                                  {(item.category === 'MATERIAL' || item.category === 'TAHOKOV') && activeAutocompleteId === item.id && (() => {
                                     const searchParts = (item.title || '').toLowerCase().split(/\s+/).filter(Boolean);
                                     const filtered = priceList.filter(p => {
                                       const titleLower = (p.title || '').toLowerCase();
@@ -2086,7 +2067,7 @@ export default function App() {
                                 </div>
                               </div>
                             <div className="flex items-center gap-2">
-                              {item.category === 'MATERIAL' ? (
+                              {(item.category === 'MATERIAL' || item.category === 'TAHOKOV') ? (
                                 <span className="text-[10px] text-slate-500 italic">
                                   {item.extraInfo || ''}
                                 </span>
@@ -2106,9 +2087,11 @@ export default function App() {
                           </div>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <div className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded inline-block min-w-[32px]">
-                            {item.unit}
-                          </div>
+                          {item.unit && (
+                            <div className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded inline-block min-w-[32px]">
+                              {item.unit}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-center gap-3 text-xs">
@@ -2121,10 +2104,25 @@ export default function App() {
                                 <div className="text-slate-300">×</div>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Kg/MJ</label>
-                                  <div className="w-12 text-center text-slate-900 font-medium">{item.weightPerUnit || 0}</div>
+                                  <input type="number" onFocus={handleNumericFocus} value={item.weightPerUnit === 0 ? '' : item.weightPerUnit} placeholder="0" onChange={(e) => updateItem(item.id, { weightPerUnit: Number(e.target.value) })} className="w-12 text-center text-slate-900 p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-400 font-bold">= {(Number(item.quantity || 0) * (Number(item.weightPerUnit) || 0)).toFixed(1)} kg</div>
                               </>
+                            )}
+
+                            {item.category === 'TAHOKOV' && (
+                              <div className="flex flex-col items-center">
+                                <label className="text-[9px] text-slate-400 uppercase">Hmotnost (kg)</label>
+                                <input 
+                                  type="number" 
+                                  onFocus={handleNumericFocus} 
+                                  value={item.quantity === 0 ? '' : item.quantity} 
+                                  placeholder="0" 
+                                  onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} 
+                                  className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" 
+                                  title="Hmotnost pro výpočet žárového zinku"
+                                />
+                              </div>
                             )}
 
                             {item.category === 'ZINEK_ZAROVY' && (
@@ -2183,7 +2181,7 @@ export default function App() {
                               </div>
                             )}
 
-                            {(['OTHER', 'TAHOKOV', 'LAKOVANI_MOKRE', 'LAKOVANI_PRASKOVE', 'ZINEK_GALVANICKY'].includes(item.category)) && (
+                            {(['OTHER', 'LAKOVANI_MOKRE', 'LAKOVANI_PRASKOVE', 'ZINEK_GALVANICKY'].includes(item.category)) && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Množství (MJ)</label>
                                 <input type="number" onFocus={handleNumericFocus} value={item.quantity === 0 ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
@@ -2196,6 +2194,8 @@ export default function App() {
                             <span className="tabular-nums font-medium text-slate-900">
                               {getItemTotal(item).toLocaleString()}
                             </span>
+                          ) : item.category === 'TAHOKOV' ? (
+                            <span className="text-slate-400">—</span>
                           ) : (
                             <input 
                               type="number"
@@ -2208,7 +2208,21 @@ export default function App() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-right font-semibold tabular-nums text-slate-900 text-nowrap">
-                          {getItemTotal(item).toLocaleString()} {offer.currency === 'CZK' ? 'Kč' : offer.currency}
+                          {item.category === 'TAHOKOV' ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <input 
+                                type="number"
+                                onFocus={handleNumericFocus}
+                                value={item.pricePerUnit === 0 ? '' : item.pricePerUnit}
+                                placeholder="0"
+                                onChange={(e) => updateItem(item.id, { pricePerUnit: Number(e.target.value) })}
+                                className="w-24 text-right bg-transparent border-b border-slate-300 p-0 focus:ring-0 tabular-nums font-bold text-slate-900"
+                              />
+                              <span>{offer.currency === 'CZK' ? 'Kč' : offer.currency}</span>
+                            </div>
+                          ) : (
+                            <>{getItemTotal(item).toLocaleString()} {offer.currency === 'CZK' ? 'Kč' : offer.currency}</>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-right">
                           <button 
