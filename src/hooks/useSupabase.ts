@@ -72,8 +72,13 @@ export function useSupabase() {
 
     const { error } = await supabase.from('offers').upsert({
       id: offer.id,
+      user_id: user.id,
       full_data: offer,
-      user_id: user.id
+      status: offer.status,
+      number: offer.number,
+      title: offer.title,
+      client_name: offer.client?.name || '',
+      updated_at: new Date().toISOString()
     });
 
     if (error) {
