@@ -2008,7 +2008,7 @@ export default function App() {
                                     const filtered = priceList.filter(p => {
                                       const titleLower = (p.title || '').toLowerCase();
                                       return searchParts.length === 0 || searchParts.every(part => titleLower.includes(part));
-                                    }).slice(0, 10);
+                                    }).slice(0, 200);
                                     return (
                                       <div className="absolute z-[100] left-0 top-full mt-1 w-[280px] sm:w-[500px] bg-white border border-slate-200 rounded-lg shadow-2xl overflow-hidden border-t-4 border-t-blue-500">
                                         <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-100 flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-widest">
