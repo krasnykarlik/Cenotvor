@@ -266,6 +266,48 @@ const parseSpreadsheetData = (text: string) => {
   return { items, headers: rawHeaders };
 };
 
+type DecimalInputProps = Omit<React.ComponentProps<'input'>, 'type' | 'inputMode' | 'value' | 'onChange' | 'onFocus' | 'onBlur'> & {
+  value: number | undefined;
+  onValueChange: (value: number) => void;
+  commitOnBlur?: boolean;
+};
+
+function DecimalInput({ value, onValueChange, commitOnBlur = false, ...props }: DecimalInputProps) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const displayValue = value === undefined ? '' : String(value).replace('.', ',');
+
+  const updateValue = (text: string) => {
+    const number = Number(text.replace(',', '.'));
+    if (Number.isFinite(number)) {
+      onValueChange(number);
+    }
+  };
+
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode="decimal"
+      value={draft ?? displayValue}
+      onFocus={(event) => {
+        setDraft(event.currentTarget.value);
+        event.currentTarget.select();
+      }}
+      onChange={(event) => {
+        const text = event.currentTarget.value;
+        if (!/^-?\d*(?:[,.]\d{0,3})?$/.test(text)) return;
+
+        setDraft(text);
+        if (!commitOnBlur) updateValue(text);
+      }}
+      onBlur={() => {
+        if (commitOnBlur && draft !== null && draft !== displayValue) updateValue(draft);
+        setDraft(null);
+      }}
+    />
+  );
+}
+
 export default function App() {
   const { 
     user, 
@@ -868,10 +910,6 @@ export default function App() {
       }
     }
   }, [preparers, defaultValidityDays, sheetUrl, lastSync, user, userSettings]);
-
-  const handleNumericFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.select();
-  };
 
   if (supabaseLoading) {
     return (
@@ -2104,12 +2142,12 @@ export default function App() {
                               <>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Množství (MJ)</label>
-                                  <input type="number" onFocus={handleNumericFocus} value={item.quantity === 0 ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <DecimalInput value={item.quantity || undefined} placeholder="0" onValueChange={(value) => updateItem(item.id, { quantity: value })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-300">×</div>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Kg/MJ</label>
-                                  <input type="number" onFocus={handleNumericFocus} value={item.weightPerUnit === 0 ? '' : item.weightPerUnit} placeholder="0" onChange={(e) => updateItem(item.id, { weightPerUnit: Number(e.target.value) })} className="w-12 text-center text-slate-900 p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <DecimalInput value={item.weightPerUnit || undefined} placeholder="0" onValueChange={(value) => updateItem(item.id, { weightPerUnit: value })} className="w-12 text-center text-slate-900 p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-400 font-bold">= {(Number(item.quantity || 0) * (Number(item.weightPerUnit) || 0)).toFixed(1)} kg</div>
                               </>
@@ -2118,12 +2156,10 @@ export default function App() {
                             {item.category === 'TAHOKOV' && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Hmotnost (kg)</label>
-                                <input 
-                                  type="number" 
-                                  onFocus={handleNumericFocus} 
-                                  value={item.quantity === 0 ? '' : item.quantity} 
+                                <DecimalInput
+                                  value={item.quantity || undefined} 
                                   placeholder="0" 
-                                  onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} 
+                                  onValueChange={(value) => updateItem(item.id, { quantity: value })} 
                                   className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" 
                                   title="Hmotnost pro výpočet žárového zinku"
                                 />
@@ -2141,12 +2177,12 @@ export default function App() {
                               <>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Lidí</label>
-                                  <input type="number" onFocus={handleNumericFocus} value={item.persons === 0 ? '' : item.persons} placeholder="0" onChange={(e) => updateItem(item.id, { persons: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <DecimalInput value={item.persons || undefined} placeholder="0" onValueChange={(value) => updateItem(item.id, { persons: value })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-300">×</div>
                                 <div className="flex flex-col items-center">
                                   <label className="text-[9px] text-slate-400 uppercase">Hodin</label>
-                                  <input type="number" onFocus={handleNumericFocus} value={item.hours === 0 ? '' : item.hours} placeholder="0" onChange={(e) => updateItem(item.id, { hours: Number(e.target.value) })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
+                                  <DecimalInput value={item.hours || undefined} placeholder="0" onValueChange={(value) => updateItem(item.id, { hours: value })} className="w-10 text-center p-0 border-none bg-transparent focus:ring-0 font-medium" />
                                 </div>
                                 <div className="text-slate-400 font-bold">= {(Number(item.persons || 0)) * (Number(item.hours || 0))} h</div>
                               </>
@@ -2155,7 +2191,7 @@ export default function App() {
                             {item.category === 'DOPRAVA' && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Vzdálenost (km)</label>
-                                <input type="number" onFocus={handleNumericFocus} value={item.km === 0 ? '' : item.km} placeholder="0" onChange={(e) => updateItem(item.id, { km: Number(e.target.value) })} className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
+                                <DecimalInput value={item.km || undefined} placeholder="0" onValueChange={(value) => updateItem(item.id, { km: value })} className="w-16 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
                               </div>
                             )}
 
@@ -2173,13 +2209,11 @@ export default function App() {
                                   <option value={0}>Individual</option>
                                 </select>
                                 {(![2.6, 4.2, 6.5].includes(item.coefficient || 0) || item.coefficient === 0) && (
-                                  <input 
-                                    type="number" 
-                                    step="0.1"
-                                    onFocus={handleNumericFocus}
-                                    value={!item.coefficient && item.coefficient !== 0 ? '' : item.coefficient}
+                                  <DecimalInput
+                                    value={item.coefficient}
+                                    commitOnBlur
                                     placeholder="0" 
-                                    onChange={(e) => updateItem(item.id, { coefficient: Number(e.target.value) })}
+                                    onValueChange={(value) => updateItem(item.id, { coefficient: value })}
                                     className="w-12 text-center text-[10px] p-0 border-b border-slate-200 bg-transparent focus:ring-0"
                                   />
                                 )}
@@ -2189,7 +2223,7 @@ export default function App() {
                             {(['OTHER', 'LAKOVANI_MOKRE', 'LAKOVANI_PRASKOVE', 'ZINEK_GALVANICKY'].includes(item.category)) && (
                               <div className="flex flex-col items-center">
                                 <label className="text-[9px] text-slate-400 uppercase">Množství (MJ)</label>
-                                <input type="number" onFocus={handleNumericFocus} value={item.quantity === 0 ? '' : item.quantity} placeholder="0" onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
+                                <DecimalInput value={item.quantity || undefined} placeholder="0" onValueChange={(value) => updateItem(item.id, { quantity: value })} className="w-12 text-center p-0 border-none bg-transparent focus:ring-0 font-bold" />
                               </div>
                             )}
                           </div>
@@ -2202,12 +2236,10 @@ export default function App() {
                           ) : item.category === 'TAHOKOV' ? (
                             <span className="text-slate-400">—</span>
                           ) : (
-                            <input 
-                              type="number"
-                              onFocus={handleNumericFocus}
-                              value={item.pricePerUnit === 0 ? '' : item.pricePerUnit}
+                            <DecimalInput
+                              value={item.pricePerUnit || undefined}
                               placeholder="0"
-                              onChange={(e) => updateItem(item.id, { pricePerUnit: Number(e.target.value) })}
+                              onValueChange={(value) => updateItem(item.id, { pricePerUnit: value })}
                               className="w-full text-right bg-transparent border-none p-0 focus:ring-0 tabular-nums font-medium"
                             />
                           )}
@@ -2215,12 +2247,10 @@ export default function App() {
                         <td className="px-6 py-4 text-right font-semibold tabular-nums text-slate-900 text-nowrap">
                           {item.category === 'TAHOKOV' ? (
                             <div className="flex items-center justify-end gap-1">
-                              <input 
-                                type="number"
-                                onFocus={handleNumericFocus}
-                                value={item.pricePerUnit === 0 ? '' : item.pricePerUnit}
+                              <DecimalInput
+                                value={item.pricePerUnit || undefined}
                                 placeholder="0"
-                                onChange={(e) => updateItem(item.id, { pricePerUnit: Number(e.target.value) })}
+                                onValueChange={(value) => updateItem(item.id, { pricePerUnit: value })}
                                 className="w-24 text-right bg-transparent border-b border-slate-300 p-0 focus:ring-0 tabular-nums font-bold text-slate-900"
                               />
                               <span>{offer.currency === 'CZK' ? 'Kč' : offer.currency}</span>
@@ -2652,23 +2682,19 @@ export default function App() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl gap-4 border border-slate-100">
                     <span className="text-sm text-slate-600 font-medium tracking-tight">Délka plechu (m):</span>
-                    <input 
-                      type="number" 
-                      onFocus={handleNumericFocus}
-                      value={calcLength === 0 ? '' : calcLength} 
+                    <DecimalInput
+                      value={calcLength || undefined} 
                       placeholder="0"
-                      onChange={(e) => setCalcLength(Number(e.target.value))}
+                      onValueChange={(value) => setCalcLength(value)}
                       className="w-24 text-right text-sm font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
                   </div>
                   <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl gap-4 border border-slate-100">
                     <span className="text-sm text-slate-600 font-medium tracking-tight">Šířka plechu (m):</span>
-                    <input 
-                      type="number" 
-                      onFocus={handleNumericFocus}
-                      value={calcWidth === 0 ? '' : calcWidth} 
+                    <DecimalInput
+                      value={calcWidth || undefined} 
                       placeholder="0"
-                      onChange={(e) => setCalcWidth(Number(e.target.value))}
+                      onValueChange={(value) => setCalcWidth(value)}
                       className="w-24 text-right text-sm font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
                   </div>
@@ -2680,12 +2706,10 @@ export default function App() {
                   <div className="py-2">
                     <div className="flex justify-between items-center bg-blue-50 p-3 rounded-xl gap-4 border border-blue-100">
                       <span className="text-sm text-blue-700 font-bold tracking-tight">Potřebuji (m²):</span>
-                      <input 
-                        type="number" 
-                        onFocus={handleNumericFocus}
-                        value={calcNeeded === 0 ? '' : calcNeeded} 
+                      <DecimalInput
+                        value={calcNeeded || undefined} 
                         placeholder="0"
-                        onChange={(e) => setCalcNeeded(Number(e.target.value))}
+                        onValueChange={(value) => setCalcNeeded(value)}
                         className="w-24 text-right text-sm font-bold bg-white border border-blue-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
                       />
                     </div>
